@@ -1,7 +1,8 @@
-import React, { useState, useMemo, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { 
   Search, Copy, X, ChevronDown, AlertTriangle, Check, 
-  BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus
+  BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus,
+  Bookmark, BookmarkCheck, Trash2, Download, Upload
 } from 'lucide-react';
 
 // Validation function for Pokemon GO search strings
@@ -255,10 +256,46 @@ const PokemonGoSearchBuilder = () => {
   const toastTimeoutRef = useRef(null);
   const [validationResult, setValidationResult] = useState({ valid: true });
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
+  const [savedSearches, setSavedSearches] = useState([]);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [saveSearchName, setSaveSearchName] = useState('');
+  const [showSavedSearches, setShowSavedSearches] = useState(false);
+  const [showQuickSearches, setShowQuickSearches] = useState(false);
+  const [showPokemonSelection, setShowPokemonSelection] = useState(false);
+  const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
+  const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
   // This preserves Pokedex numbers when filters are updated
   const pokedexNumbersRef = useRef('');
+
+  // Load saved searches from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('pogoSearches');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          setSavedSearches(parsed);
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load saved searches:', err);
+    }
+  }, []);
+
+  // Save searches to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem('pogoSearches', JSON.stringify(savedSearches));
+    } catch (err) {
+      console.error('Failed to save searches:', err);
+      // Handle quota exceeded error
+      if (err.name === 'QuotaExceededError') {
+        alert('Storage limit reached. Please delete some saved searches.');
+      }
+    }
+  }, [savedSearches]);
 
   // Cleanup toast timeout on unmount
   React.useEffect(() => {
@@ -813,6 +850,178 @@ const PokemonGoSearchBuilder = () => {
     setFilterSearch('');
   };
 
+  // Insert Pokemon numbers into search string
+  const insertPokemonNumbers = (numbers) => {
+    setIsPremadeSearch(false);
+    
+    if (!searchString || searchString.trim() === '') {
+      // If search string is empty, just set the numbers
+      setSearchString(numbers);
+      extractPokedexNumbers(numbers);
+      return;
+    }
+    
+    // Split by & to get parts
+    const parts = searchString.split('&').map(p => p.trim()).filter(p => p);
+    
+    // Find the Pokedex number part (all digits and commas, or ranges)
+    let pokedexIndex = -1;
+    let existingPokedex = '';
+    
+    for (let i = 0; i < parts.length; i++) {
+      // Check if this part is Pokedex numbers (digits, commas, and hyphens for ranges)
+      if (/^[\d,\-]+$/.test(parts[i])) {
+        pokedexIndex = i;
+        existingPokedex = parts[i];
+        break;
+      }
+    }
+    
+    // If there's an existing Pokedex number part, merge with comma
+    if (pokedexIndex >= 0) {
+      // Merge existing numbers with new numbers using comma
+      const merged = existingPokedex ? `${existingPokedex},${numbers}` : numbers;
+      parts[pokedexIndex] = merged;
+      const newSearchString = parts.join('&');
+      setSearchString(newSearchString);
+      extractPokedexNumbers(newSearchString);
+    } else {
+      // No existing Pokedex numbers, prepend them
+      const newSearchString = `${numbers}&${searchString}`;
+      setSearchString(newSearchString);
+      extractPokedexNumbers(newSearchString);
+    }
+  };
+
+  // Saved searches functions
+  const handleSaveSearch = () => {
+    if (!searchString || searchString.trim() === '') {
+      return;
+    }
+    setSaveSearchName('');
+    setShowSaveModal(true);
+  };
+
+  const confirmSaveSearch = () => {
+    const name = saveSearchName.trim();
+    if (!name) {
+      return;
+    }
+
+    const newSearch = {
+      id: Date.now().toString(),
+      name: name,
+      searchString: searchString,
+      createdAt: new Date().toISOString()
+    };
+
+    setSavedSearches(prev => {
+      const updated = [newSearch, ...prev];
+      // Limit to MAX_SAVED_SEARCHES
+      if (updated.length > MAX_SAVED_SEARCHES) {
+        return updated.slice(0, MAX_SAVED_SEARCHES);
+      }
+      return updated;
+    });
+
+    setShowSaveModal(false);
+    setSaveSearchName('');
+    
+    // Show success animation
+    setSaveSuccessVisible(true);
+    setTimeout(() => {
+      setSaveSuccessVisible(false);
+    }, 2000);
+  };
+
+  const deleteSavedSearch = (id) => {
+    setSavedSearches(prev => prev.filter(s => s.id !== id));
+  };
+
+  const loadSavedSearch = (savedSearch) => {
+    const { included, excluded } = parseSearchStringToFilters(savedSearch.searchString);
+    extractPokedexNumbers(savedSearch.searchString);
+    setSearchString(savedSearch.searchString);
+    setIncludedFilters(included);
+    setExcludedFilters(excluded);
+    setIsPremadeSearch(true);
+  };
+
+  const copySavedSearch = async (searchString) => {
+    try {
+      await navigator.clipboard.writeText(searchString);
+      setCopySuccess(true);
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const exportSavedSearches = () => {
+    try {
+      const dataStr = JSON.stringify(savedSearches, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'pogo-searches.json';
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('Failed to export:', err);
+    }
+  };
+
+  const importSavedSearches = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const imported = JSON.parse(e.target.result);
+        if (Array.isArray(imported)) {
+          setSavedSearches(prev => {
+            const combined = [...imported, ...prev];
+            // Remove duplicates based on searchString
+            const unique = combined.filter((search, index, self) =>
+              index === self.findIndex(s => s.searchString === search.searchString)
+            );
+            // Limit to MAX_SAVED_SEARCHES
+            return unique.slice(0, MAX_SAVED_SEARCHES);
+          });
+        }
+      } catch (err) {
+        console.error('Failed to import:', err);
+        alert('Failed to import saved searches. Please check the file format.');
+      }
+    };
+    reader.readAsText(file);
+    // Reset input
+    event.target.value = '';
+  };
+
+  // Pokemon Generation and Group data
+  const pokemonGenerations = [
+    { label: 'Gen 1', range: '1-151' },
+    { label: 'Gen 2', range: '152-251' },
+    { label: 'Gen 3', range: '252-386' },
+    { label: 'Gen 4', range: '387-493' },
+    { label: 'Gen 5', range: '494-649' },
+    { label: 'Gen 6', range: '650-721' },
+    { label: 'Gen 7', range: '722-809' },
+    { label: 'Gen 8', range: '810-905' },
+  ];
+
+  const pokemonGroups = [
+    { label: 'All Starters', numbers: '1,4,7,152,155,158,252,255,258,387,390,393,495,498,501,650,653,656,722,725,728,810,813,816' },
+    { label: 'Kanto Starters', numbers: '1,4,7' },
+    { label: 'Johto Starters', numbers: '152,155,158' },
+    { label: 'Hoenn Starters', numbers: '252,255,258' },
+    { label: 'Pseudo-Legendaries', numbers: '147,148,149,246,247,248,371,372,373,443,444,445,610,611,612,633,634,635,704,705,706,782,783,784,885,886,887' },
+    { label: 'Eeveelutions', numbers: '133,134,135,136,196,197,470,471,700' },
+  ];
+
   // Premade search presets
   const premadeSearches = {
     sTierShadow: {
@@ -992,134 +1201,164 @@ const PokemonGoSearchBuilder = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-blue-50 to-cyan-50 p-4 md:p-6 lg:p-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-cyan-50/50">
       <CopyToast />
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold text-gray-800 mb-2">
-            Pokémon GO Search Builder
-          </h1>
-          <p className="text-gray-600 text-base md:text-lg">
-            Build advanced search strings with ease
-          </p>
-        </div>
+      
+      {/* Sticky Header with Output Section */}
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          {/* Compact Header */}
+          <div className="mb-4">
+            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0077BE] to-[#00A7E5] bg-clip-text text-transparent">
+              Pokémon GO Search Builder
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+              Build search strings visually
+            </p>
+          </div>
 
-        {/* Search String Display - BIGGEST ELEMENT */}
-        <div className="bg-white rounded-xl shadow-lg p-5 md:p-6 mb-6 border border-gray-200">
-          <div className="flex items-center gap-2 mb-3">
-            <label className="block text-sm font-semibold text-gray-700">
-              Search String
-            </label>
-            {!validationResult.valid && (
-              <div 
-                className="relative"
-                onMouseEnter={() => setShowValidationTooltip(true)}
-                onMouseLeave={() => setShowValidationTooltip(false)}
+          {/* Output Section - FOCAL POINT */}
+          <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-bold text-gray-700">
+                  Search String
+                </label>
+                {(includedFilters.length > 0 || excludedFilters.length > 0) && (
+                  <span className="px-2 py-0.5 bg-[#0077BE] text-white text-xs font-bold rounded-full">
+                    {includedFilters.length + excludedFilters.length} active
+                  </span>
+                )}
+                {!validationResult.valid && (
+                  <div 
+                    className="relative"
+                    onMouseEnter={() => setShowValidationTooltip(true)}
+                    onMouseLeave={() => setShowValidationTooltip(false)}
+                  >
+                    <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
+                    {showValidationTooltip && (
+                      <div className="absolute left-0 top-full mt-2 z-50 px-3 py-2 bg-amber-50 border-2 border-amber-400 rounded-lg shadow-xl whitespace-nowrap">
+                        <p className="text-xs font-semibold text-amber-800">
+                          {validationResult.error}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={clearAll}
+                className="text-xs font-semibold text-gray-500 hover:text-red-500 transition-colors px-2 py-1"
               >
-                <AlertTriangle className="w-5 h-5 text-yellow-600 cursor-help" />
-                {showValidationTooltip && (
-                  <div className="absolute left-0 top-full mt-2 z-50 px-3 py-2 bg-yellow-100 border-2 border-yellow-400 rounded-lg shadow-lg whitespace-nowrap">
-                    <p className="text-sm font-semibold text-yellow-800">
-                      Invalid syntax: {validationResult.error}
-                    </p>
+                Clear All
+              </button>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  value={searchString}
+                  onChange={(e) => {
+                    const newValue = e.target.value;
+                    setSearchString(newValue);
+                    setIsPremadeSearch(false);
+                    extractPokedexNumbers(newValue);
+                  }}
+                  placeholder="Your search string will appear here..."
+                  className={`w-full min-h-[48px] sm:min-h-[56px] px-4 py-3 border-2 rounded-xl focus:outline-none font-mono text-sm sm:text-base transition-all duration-200 ${
+                    !validationResult.valid 
+                      ? 'border-amber-400 focus:border-amber-500 bg-amber-50/50' 
+                      : 'border-blue-200 focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 bg-white'
+                  }`}
+                />
+                {!validationResult.valid && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={copyToClipboard}
+                className={`min-h-[48px] sm:min-h-[56px] px-6 sm:px-8 rounded-xl font-bold text-white transition-all duration-200 transform active:scale-95 ${
+                  copySuccess 
+                    ? 'bg-emerald-500 shadow-lg shadow-emerald-200' 
+                    : 'bg-[#0077BE] hover:bg-[#005A8F] hover:shadow-lg hover:shadow-blue-200'
+                } flex items-center justify-center gap-2 text-sm sm:text-base`}
+              >
+                {copySuccess ? (
+                  <>
+                    <Check className="w-5 h-5" />
+                    <span>Copied!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-5 h-5" />
+                    <span className="hidden sm:inline">Copy</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Save Search Button */}
+            {searchString && searchString.trim() !== '' && (
+              <div className="mt-3 flex items-center justify-between">
+                <button
+                  onClick={handleSaveSearch}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95 touch-manipulation"
+                >
+                  <Bookmark className="w-4 h-4" />
+                  <span>Save this search</span>
+                </button>
+                {saveSuccessVisible && (
+                  <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm animate-save-success">
+                    <BookmarkCheck className="w-5 h-5" />
+                    <span>Search saved!</span>
                   </div>
                 )}
               </div>
             )}
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <div className="flex-[0.7] relative">
-              <input
-                type="text"
-                value={searchString}
-                onChange={(e) => {
-                  const newValue = e.target.value;
-                  setSearchString(newValue);
-                  setIsPremadeSearch(false); // Reset premade search flag when manually editing
-                  // Extract and preserve Pokedex numbers from the manually edited string
-                  extractPokedexNumbers(newValue);
-                }}
-                placeholder="Your search string will appear here..."
-                className={`w-full min-h-[50px] px-4 py-3 border-2 rounded-lg focus:outline-none font-mono text-sm md:text-base transition-colors ${
-                  !validationResult.valid 
-                    ? 'border-yellow-500 focus:border-yellow-600' 
-                    : 'border-gray-300 focus:border-blue-500'
-                }`}
-              />
-              {!validationResult.valid && (
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
+
+            {/* Conflicts Warning */}
+            {conflicts.length > 0 && (
+              <div className="mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg flex items-start gap-2 animate-pulse-warning">
+                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <p className="font-bold text-amber-800 text-sm mb-1">⚠️ Conflicting Filters</p>
+                  {conflicts.map((conflict, idx) => (
+                    <p key={idx} className="text-xs text-amber-700">{conflict}</p>
+                  ))}
                 </div>
-              )}
-            </div>
-            <button
-              onClick={copyToClipboard}
-              className={`flex-[0.15] min-h-[50px] px-4 py-3 rounded-lg font-semibold text-white transition-all duration-200 hover:opacity-90 ${
-                copySuccess 
-                  ? 'bg-green-500' 
-                  : 'bg-[#10B981] hover:bg-[#059669]'
-              } flex items-center justify-center gap-2`}
-            >
-              {copySuccess ? (
-                <>
-                  <Check className="w-5 h-5" />
-                  <span>Copied!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-5 h-5" />
-                  <span>Copy</span>
-                </>
-              )}
-            </button>
-            <button
-              onClick={clearAll}
-              className="flex-[0.15] min-h-[50px] px-4 py-3 bg-[#EF4444] hover:bg-[#DC2626] text-white rounded-lg font-semibold transition-all duration-200 hover:opacity-90"
-            >
-              Clear All
-            </button>
-          </div>
-
-          {/* Conflicts Warning */}
-          {conflicts.length > 0 && (
-            <div className="mt-4 p-4 bg-yellow-50 border-2 border-yellow-400 rounded-lg flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-yellow-800 mb-1">⚠️ Conflicting Filters Detected</p>
-                {conflicts.map((conflict, idx) => (
-                  <p key={idx} className="text-sm text-yellow-700">{conflict}</p>
-                ))}
-                <p className="text-xs text-yellow-600 mt-2">This search won't return any results in Pokémon GO.</p>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
+      </div>
 
-        {/* Active Filter Chips - PROMINENTLY DISPLAYED */}
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+
+        {/* Active Filter Chips - Compact Display */}
         {(includedFilters.length > 0 || excludedFilters.length > 0) && (
-          <div className="bg-white rounded-xl shadow-lg p-5 md:p-6 mb-6 border border-gray-200">
-            <label className="block text-sm font-semibold text-gray-700 mb-3">
-              Active Filters ({includedFilters.length + excludedFilters.length})
-            </label>
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100">
             <div className="flex flex-wrap gap-2">
               {includedFilters.map(filterId => {
                 const isRemoving = removingChip === filterId;
                 return (
                   <div
                     key={`included-${filterId}`}
-                    className={`inline-flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-full font-medium transition-all duration-300 ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#0077BE] to-[#00A7E5] text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
                       isRemoving ? 'chip-fade-out' : 'chip-fade-in'
                     }`}
                   >
                     <Plus className="w-3 h-3" />
-                    <span className="text-sm whitespace-nowrap">{getChipLabel(filterId)}</span>
+                    <span className="whitespace-nowrap">{getChipLabel(filterId)}</span>
                     <button
                       onClick={() => removeFilter(filterId, false)}
-                      className="hover:bg-blue-600 rounded-full p-0.5 transition-colors"
+                      className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
                       aria-label="Remove filter"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 );
@@ -1129,18 +1368,18 @@ const PokemonGoSearchBuilder = () => {
                 return (
                   <div
                     key={`excluded-${filterId}`}
-                    className={`inline-flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-full font-medium transition-all duration-300 ${
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
                       isRemoving ? 'chip-fade-out' : 'chip-fade-in'
                     }`}
                   >
                     <Minus className="w-3 h-3" />
-                    <span className="text-sm whitespace-nowrap">{getChipLabel(filterId)}</span>
+                    <span className="whitespace-nowrap">{getChipLabel(filterId)}</span>
                     <button
                       onClick={() => removeFilter(filterId, true)}
-                      className="hover:bg-red-600 rounded-full p-0.5 transition-colors"
+                      className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
                       aria-label="Remove filter"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 );
@@ -1149,139 +1388,281 @@ const PokemonGoSearchBuilder = () => {
           </div>
         )}
 
-        {/* Premade Searches - Raid Tiers */}
-        <div className="bg-white rounded-xl shadow-lg p-5 md:p-6 mb-6 border border-gray-200">
-          <label className="block text-sm font-semibold text-gray-700 mb-4">
-            Premade Searches
-          </label>
-          <div className="mb-4">
-            <h3 className="text-base font-bold text-gray-800 mb-2">Raid Tier Attackers</h3>
-            <p className="text-sm text-gray-600 mb-2">
-              Quick access to Pokemon GO Hub's raid tier rankings
-            </p>
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-800 font-medium mb-1">ℹ️ Shadow vs Non-Shadow</p>
-              <p className="text-xs text-blue-700">
-                Pokemon GO cannot display Shadow and non-Shadow versions simultaneously in search results. 
-                Use separate searches for Shadow and non-Shadow Pokemon.
-              </p>
+        {/* Saved Searches - Collapsible Section */}
+        {savedSearches.length > 0 && (
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-purple-100">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowSavedSearches(!showSavedSearches)}
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                >
+                  <h3 className="text-base sm:text-lg font-bold text-gray-800">Saved Searches</h3>
+                  <ChevronDown 
+                    className={`w-5 h-5 transition-transform duration-300 ${showSavedSearches ? 'rotate-180' : ''}`}
+                  />
+                </button>
+                <span className="px-2 py-0.5 bg-purple-200 text-purple-800 text-xs font-bold rounded-full">
+                  {savedSearches.length}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="cursor-pointer p-2 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation" title="Import searches">
+                  <Upload className="w-4 h-4 text-purple-600" />
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={importSavedSearches}
+                    className="hidden"
+                  />
+                </label>
+                {savedSearches.length > 0 && (
+                  <button
+                    onClick={exportSavedSearches}
+                    className="p-2 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation"
+                    title="Export searches"
+                  >
+                    <Download className="w-4 h-4 text-purple-600" />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {showSavedSearches && (
+              <div className="saved-searches-expand space-y-2">
+                {savedSearches.map((saved) => (
+                  <div
+                    key={saved.id}
+                    className="group flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all duration-200"
+                  >
+                    <div 
+                      className="flex-1 min-w-0 cursor-pointer"
+                      onClick={() => loadSavedSearch(saved)}
+                    >
+                      <div className="font-semibold text-sm text-gray-800 mb-1 truncate">
+                        {saved.name}
+                      </div>
+                      <div className="text-xs text-gray-600 font-mono truncate">
+                        {saved.searchString}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => copySavedSearch(saved.searchString)}
+                        className="p-2 hover:bg-purple-100 rounded-lg transition-colors touch-manipulation"
+                        title="Copy search string"
+                      >
+                        <Copy className="w-4 h-4 text-purple-600" />
+                      </button>
+                      <button
+                        onClick={() => deleteSavedSearch(saved.id)}
+                        className="p-2 hover:bg-red-100 rounded-lg transition-colors touch-manipulation"
+                        title="Delete saved search"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          
-          {/* S-Tier */}
-          <div className="mb-4">
-            <h4 className="text-sm font-bold text-yellow-700 mb-2">S-Tier (Apex of Power)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        )}
+
+        {/* Premade Searches - Collapsible Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-blue-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <button
-                onClick={(e) => applyPremadeSearch('sTierShadow', e)}
-                className="group relative p-4 rounded-lg border-2 border-red-400 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-md text-left"
-                title="Shadow Pokemon - apex of power"
+                onClick={() => setShowQuickSearches(!showQuickSearches)}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-lg text-red-800">
-                    {premadeSearches.sTierShadow.label}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 bg-red-200 text-red-800 rounded-full font-semibold">SHADOW</span>
-                </div>
-                <div className="text-xs text-red-700">
-                  {premadeSearches.sTierShadow.description}
-                </div>
-              </button>
-              <button
-                onClick={(e) => applyPremadeSearch('sTierNonShadow', e)}
-                className="group relative p-4 rounded-lg border-2 border-yellow-400 bg-gradient-to-br from-yellow-50 to-amber-50 hover:from-yellow-100 hover:to-amber-100 transition-all duration-200 hover:shadow-md text-left"
-                title="Mega/Primal Pokemon - top priorities"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-lg text-yellow-800">
-                    {premadeSearches.sTierNonShadow.label}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 bg-yellow-200 text-yellow-800 rounded-full font-semibold">MEGA/PRIMAL</span>
-                </div>
-                <div className="text-xs text-yellow-700">
-                  {premadeSearches.sTierNonShadow.description}
-                </div>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Searches</h3>
+                <ChevronDown 
+                  className={`w-5 h-5 transition-transform duration-300 ${showQuickSearches ? 'rotate-180' : ''}`}
+                />
               </button>
             </div>
+            <p className="text-xs text-gray-500 hidden sm:block">Raid tier attackers from Pokemon GO Hub</p>
           </div>
 
-          {/* A+ Tier */}
-          <div className="mb-4">
-            <h4 className="text-sm font-bold text-blue-700 mb-2">A+ Tier (Stand at or Near the Top)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {showQuickSearches && (
+            <div className="saved-searches-expand">
+              <div className="mb-3 p-3 bg-blue-50/80 border border-blue-200 rounded-lg">
+                <p className="text-xs text-blue-800 font-semibold mb-1">ℹ️ Shadow vs Non-Shadow</p>
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  Pokemon GO cannot display Shadow and non-Shadow versions simultaneously. Use separate searches.
+                </p>
+              </div>
+              
+              {/* S-Tier */}
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">S-Tier • Apex of Power</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <button
+                    onClick={(e) => applyPremadeSearch('sTierShadow', e)}
+                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm sm:text-base text-red-800">
+                        {premadeSearches.sTierShadow.label}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-red-700">
+                      {premadeSearches.sTierShadow.description}
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => applyPremadeSearch('sTierNonShadow', e)}
+                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm sm:text-base text-amber-800">
+                        {premadeSearches.sTierNonShadow.label}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full font-bold">MEGA/PRIMAL</span>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-amber-700">
+                      {premadeSearches.sTierNonShadow.description}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* A+ Tier */}
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">A+ Tier • Stand at or Near the Top</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <button
+                    onClick={(e) => applyPremadeSearch('aPlusTierShadow', e)}
+                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm sm:text-base text-red-800">
+                        {premadeSearches.aPlusTierShadow.label}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-red-700">
+                      {premadeSearches.aPlusTierShadow.description}
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => applyPremadeSearch('aPlusTierNonShadow', e)}
+                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm sm:text-base text-blue-800">
+                        {premadeSearches.aPlusTierNonShadow.label}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded-full font-bold">MEGA</span>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-blue-700">
+                      {premadeSearches.aPlusTierNonShadow.description}
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* A Tier */}
+              <div>
+                <h4 className="text-xs font-bold text-emerald-700 mb-2 uppercase tracking-wide">A Tier • Gold-Standard Investment</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <button
+                    onClick={(e) => applyPremadeSearch('aTierShadow', e)}
+                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm sm:text-base text-red-800">
+                        {premadeSearches.aTierShadow.label}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-red-700">
+                      {premadeSearches.aTierShadow.description}
+                    </div>
+                  </button>
+                  <button
+                    onClick={(e) => applyPremadeSearch('aTierNonShadow', e)}
+                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-bold text-sm sm:text-base text-emerald-800">
+                        {premadeSearches.aTierNonShadow.label}
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded-full font-bold">MEGA</span>
+                    </div>
+                    <div className="text-[10px] sm:text-xs text-emerald-700">
+                      {premadeSearches.aTierNonShadow.description}
+                    </div>
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Pokemon Selection Buttons - Collapsible Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-green-100">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
               <button
-                onClick={(e) => applyPremadeSearch('aPlusTierShadow', e)}
-                className="group relative p-4 rounded-lg border-2 border-red-400 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-md text-left"
-                title="Shadow Pokemon - stand at or near the top"
+                onClick={() => setShowPokemonSelection(!showPokemonSelection)}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-lg text-red-800">
-                    {premadeSearches.aPlusTierShadow.label}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 bg-red-200 text-red-800 rounded-full font-semibold">SHADOW</span>
-                </div>
-                <div className="text-xs text-red-700">
-                  {premadeSearches.aPlusTierShadow.description}
-                </div>
-              </button>
-              <button
-                onClick={(e) => applyPremadeSearch('aPlusTierNonShadow', e)}
-                className="group relative p-4 rounded-lg border-2 border-blue-400 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-md text-left"
-                title="Mega Pokemon - stand at or near the top"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-lg text-blue-800">
-                    {premadeSearches.aPlusTierNonShadow.label}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 bg-blue-200 text-blue-800 rounded-full font-semibold">MEGA</span>
-                </div>
-                <div className="text-xs text-blue-700">
-                  {premadeSearches.aPlusTierNonShadow.description}
-                </div>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800">Pokemon Selection</h3>
+                <ChevronDown 
+                  className={`w-5 h-5 transition-transform duration-300 ${showPokemonSelection ? 'rotate-180' : ''}`}
+                />
               </button>
             </div>
+            <p className="text-xs text-gray-500 hidden sm:block">Quick insert Pokemon ranges and groups</p>
           </div>
 
-          {/* A Tier */}
-          <div className="mb-2">
-            <h4 className="text-sm font-bold text-green-700 mb-2">A-Tier (Gold-Standard Worthy of Investment)</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                onClick={(e) => applyPremadeSearch('aTierShadow', e)}
-                className="group relative p-4 rounded-lg border-2 border-red-400 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-md text-left"
-                title="Shadow Pokemon - gold-standard worthy of investment"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-lg text-red-800">
-                    {premadeSearches.aTierShadow.label}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 bg-red-200 text-red-800 rounded-full font-semibold">SHADOW</span>
+          {showPokemonSelection && (
+            <div className="saved-searches-expand">
+              {/* Generation Buttons */}
+              <div className="mb-4">
+                <h4 className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">Generations</h4>
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+                  {pokemonGenerations.map((gen) => (
+                    <button
+                      key={gen.label}
+                      onClick={() => insertPokemonNumbers(gen.range)}
+                      className="px-3 py-2 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm text-green-800 mb-0.5">{gen.label}</div>
+                      <div className="text-[10px] text-green-600 font-mono">{gen.range}</div>
+                    </button>
+                  ))}
                 </div>
-                <div className="text-xs text-red-700">
-                  {premadeSearches.aTierShadow.description}
+              </div>
+
+              {/* Pokemon Group Buttons */}
+              <div>
+                <h4 className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">Pokemon Groups</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                  {pokemonGroups.map((group) => (
+                    <button
+                      key={group.label}
+                      onClick={() => insertPokemonNumbers(group.numbers)}
+                      className="px-3 py-2 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm text-purple-800 mb-0.5">{group.label}</div>
+                      <div className="text-[10px] text-purple-600 font-mono truncate" title={group.numbers}>
+                        {group.numbers.length > 40 ? `${group.numbers.substring(0, 40)}...` : group.numbers}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-              </button>
-              <button
-                onClick={(e) => applyPremadeSearch('aTierNonShadow', e)}
-                className="group relative p-4 rounded-lg border-2 border-green-400 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-all duration-200 hover:shadow-md text-left"
-                title="Mega Pokemon - gold-standard worthy of investment"
-              >
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-bold text-lg text-green-800">
-                    {premadeSearches.aTierNonShadow.label}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 bg-green-200 text-green-800 rounded-full font-semibold">MEGA</span>
-                </div>
-                <div className="text-xs text-green-700">
-                  {premadeSearches.aTierNonShadow.description}
-                </div>
-              </button>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Filter Search */}
-        <div className="bg-white rounded-xl shadow-lg p-5 md:p-6 mb-6 border border-gray-200">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100">
           <div className="relative">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <input
@@ -1289,49 +1670,62 @@ const PokemonGoSearchBuilder = () => {
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               placeholder="Search filters... (e.g., 'shiny', 'attack', 'mega')"
-              className="w-full pl-12 pr-12 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-base transition-colors"
+              className="w-full pl-12 pr-12 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base transition-all duration-200 bg-white"
             />
             {filterSearch && (
               <button
                 onClick={clearSearch}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 hover:bg-gray-100 rounded transition-colors"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
                 aria-label="Clear search"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             )}
           </div>
         </div>
 
-        {/* Filter Categories - STACK VERTICALLY */}
-        <div className="space-y-4">
+        {/* Filter Categories - Modern Accordion */}
+        <div className="space-y-3 sm:space-y-4">
           {Object.entries(filteredCategories).map(([key, category]) => {
             const meta = categoryMeta[key];
             const Icon = meta.icon;
             const isExpanded = expandedCategories[key];
+            const activeCount = category.filters.filter(f => 
+              includedFilters.includes(f.id) || excludedFilters.includes(f.id)
+            ).length;
             
             return (
-              <div key={key} className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
-                {/* Category Header - FULL WIDTH BAR */}
+              <div key={key} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow duration-200">
+                {/* Category Header */}
                 <button
                   onClick={() => toggleCategory(key)}
-                  className={`w-full h-[60px] px-6 flex items-center justify-between bg-gradient-to-r ${meta.gradient} text-white hover:opacity-90 transition-all duration-300`}
+                  className={`w-full min-h-[56px] px-4 sm:px-6 flex items-center justify-between bg-gradient-to-r ${meta.gradient} text-white hover:opacity-95 active:opacity-90 transition-all duration-200 touch-manipulation`}
                 >
-                  <div className="flex items-center gap-4">
-                    <Icon className="w-6 h-6" />
-                    <span className="font-bold text-lg">
-                      {category.name} ({category.filters.length})
-                    </span>
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1">
+                    <Icon className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="font-bold text-sm sm:text-base truncate">
+                        {category.name}
+                      </span>
+                      <span className="text-xs sm:text-sm opacity-90">
+                        ({category.filters.length})
+                      </span>
+                      {activeCount > 0 && (
+                        <span className="px-2 py-0.5 bg-white/30 text-white text-xs font-bold rounded-full">
+                          {activeCount}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <ChevronDown 
-                    className={`w-6 h-6 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
+                    className={`w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}
                   />
                 </button>
 
-                {/* Category Content - SMOOTH EXPAND */}
+                {/* Category Content - Smooth Expand */}
                 {isExpanded && (
-                  <div className="category-expand p-5">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                  <div className="category-expand p-4 sm:p-5 bg-white">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {category.filters.map(filter => {
                         const isIncluded = includedFilters.includes(filter.id);
                         const isExcluded = excludedFilters.includes(filter.id);
@@ -1339,43 +1733,51 @@ const PokemonGoSearchBuilder = () => {
                         return (
                           <Tooltip key={filter.id} filterId={filter.id}>
                             <div
-                              className={`flex items-center gap-2 p-3 min-h-[48px] rounded-lg transition-all duration-200 border ${
+                              className={`group flex items-center gap-2 p-3 min-h-[48px] rounded-xl transition-all duration-200 border-2 cursor-pointer touch-manipulation ${
                                 isIncluded 
-                                  ? 'bg-blue-50 border-blue-400' 
+                                  ? 'bg-blue-50 border-blue-400 shadow-sm' 
                                   : isExcluded
-                                  ? 'bg-red-50 border-red-400'
-                                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100'
+                                  ? 'bg-red-50 border-red-400 shadow-sm'
+                                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:shadow-sm'
                               }`}
                             >
                               <span className={`text-sm font-medium flex-1 ${
-                                isIncluded ? 'text-blue-700' : isExcluded ? 'text-red-700' : 'text-gray-800'
+                                isIncluded ? 'text-blue-800' : isExcluded ? 'text-red-800' : 'text-gray-800'
                               }`}>
                                 {filter.label}
                               </span>
-                              <div className="flex gap-1">
+                              <div className="flex gap-1.5">
                                 <button
-                                  onClick={() => toggleIncludeFilter(filter.id)}
-                                  className={`px-2 py-1 rounded text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleIncludeFilter(filter.id);
+                                  }}
+                                  className={`min-w-[48px] min-h-[48px] px-2 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center active:scale-95 filter-button-plus ${
                                     isIncluded
-                                      ? 'bg-blue-500 text-white hover:bg-blue-600'
-                                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                      ? 'filter-button-plus-selected'
+                                      : isExcluded
+                                      ? 'filter-button-plus-disabled'
+                                      : 'filter-button-plus-default'
                                   }`}
                                   title="Include"
                                 >
-                                  <Plus className="w-3 h-3" />
-                                  <span>Include</span>
+                                  <Plus className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => toggleExcludeFilter(filter.id)}
-                                  className={`px-2 py-1 rounded text-xs font-semibold transition-all duration-200 flex items-center gap-1 ${
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleExcludeFilter(filter.id);
+                                  }}
+                                  className={`min-w-[48px] min-h-[48px] px-2 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center active:scale-95 filter-button-minus ${
                                     isExcluded
-                                      ? 'bg-red-500 text-white hover:bg-red-600'
-                                      : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                      ? 'filter-button-minus-selected'
+                                      : isIncluded
+                                      ? 'filter-button-minus-disabled'
+                                      : 'filter-button-minus-default'
                                   }`}
                                   title="Exclude"
                                 >
-                                  <Minus className="w-3 h-3" />
-                                  <span>Exclude</span>
+                                  <Minus className="w-4 h-4" />
                                 </button>
                               </div>
                             </div>
@@ -1391,10 +1793,78 @@ const PokemonGoSearchBuilder = () => {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 mb-6 text-center text-gray-600 text-sm">
-          <p>Built for Pokémon GO trainers who want better inventory management 🎮</p>
+        <div className="mt-8 mb-6 text-center text-gray-500 text-xs sm:text-sm">
+          <p>Built for Pokémon GO trainers 🎮</p>
         </div>
       </div>
+
+      {/* Save Search Modal */}
+      {showSaveModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-modal-fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowSaveModal(false);
+              setSaveSearchName('');
+            }
+          }}
+        >
+          <div 
+            className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 animate-modal-slide-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-gray-800">Save Search</h3>
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setSaveSearchName('');
+                }}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600 mb-4">
+              Give your search a name to save it for later.
+            </p>
+            <input
+              type="text"
+              value={saveSearchName}
+              onChange={(e) => setSaveSearchName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  confirmSaveSearch();
+                } else if (e.key === 'Escape') {
+                  setShowSaveModal(false);
+                  setSaveSearchName('');
+                }
+              }}
+              placeholder="e.g., Perfect IV Shadows"
+              className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base mb-4"
+              autoFocus
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setSaveSearchName('');
+                }}
+                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmSaveSearch}
+                disabled={!saveSearchName.trim()}
+                className="flex-1 px-4 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

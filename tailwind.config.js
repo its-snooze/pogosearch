@@ -6,7 +6,8 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        'pogo-blue': '#00A7E5',
+        'pogo-blue': '#0077BE',
+        'pogo-blue-light': '#00A7E5',
         'pogo-cyan': '#00D4FF',
         'pogo-yellow': '#FFD700',
       },
