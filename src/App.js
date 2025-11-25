@@ -171,6 +171,8 @@ const filterCategories = {
       { id: 'legendary', label: 'Legendary', value: 'legendary' },
       { id: 'mythical', label: 'Mythical', value: 'mythical' },
       { id: 'ultrabeast', label: 'Ultra Beast', value: 'ultrabeast' },
+      { id: 'dynamax', label: 'Dynamax', value: 'dynamax' },
+      { id: 'gigantamax', label: 'Gigantamax', value: 'gigantamax' },
       { id: 'costume', label: 'Costume', value: 'costume' },
       { id: 'background', label: 'Any Background', value: 'background' },
       { id: 'locationbackground', label: 'Location Background', value: 'locationbackground' },
