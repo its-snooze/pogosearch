@@ -168,6 +168,10 @@ const filterCategories = {
       { id: 'costume', label: 'Costume', value: 'costume' },
       { id: 'hatched', label: 'Hatched', value: 'hatched' },
       { id: 'traded', label: 'Traded', value: 'traded' },
+      { id: 'alolan', label: 'Alolan Form', value: 'alolan' },
+      { id: 'galarian', label: 'Galarian Form', value: 'galarian' },
+      { id: 'hisuian', label: 'Hisuian Form', value: 'hisuian' },
+      { id: 'paldean', label: 'Paldean Form', value: 'paldean' },
       { id: 'defender', label: 'Gym Defender', value: 'defender' },
       { id: 'favorite', label: 'Favorite', value: 'favorite' },
     ]
@@ -201,6 +205,12 @@ const filterCategories = {
       { id: 'year2024', label: 'Year 2024', value: 'year2024' },
       { id: 'year2023', label: 'Year 2023', value: 'year2023' },
       { id: 'year2022', label: 'Year 2022', value: 'year2022' },
+      { id: 'year2021', label: '2021', value: 'year2021' },
+      { id: 'year2020', label: '2020', value: 'year2020' },
+      { id: 'year2019', label: '2019', value: 'year2019' },
+      { id: 'year2018', label: '2018', value: 'year2018' },
+      { id: 'year2017', label: '2017', value: 'year2017' },
+      { id: 'year2016', label: '2016', value: 'year2016' },
       { id: 'distance1000-', label: 'Distance 1000km+', value: 'distance1000-' },
       { id: 'distance100-', label: 'Distance 100km+', value: 'distance100-' },
     ]
