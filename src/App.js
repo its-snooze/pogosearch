@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { 
   Search, Copy, X, ChevronDown, AlertTriangle, Check, 
   BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus,
-  Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon
+  Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon, Globe
 } from 'lucide-react';
 
 // Validation function for Pokemon GO search strings
@@ -108,6 +108,12 @@ const categoryMeta = {
     icon: Swords, 
     gradient: 'from-red-500 to-orange-500',
     chipColor: 'bg-red-500'
+  },
+  regions: { 
+    name: 'Regions', 
+    icon: Globe, 
+    gradient: 'from-indigo-500 to-violet-500',
+    chipColor: 'bg-indigo-500'
   },
 };
 
@@ -244,6 +250,20 @@ const filterCategories = {
       { id: '@2electric', label: 'Electric Charged Move', value: '@2electric' },
     ]
   },
+  regions: {
+    name: 'Regions',
+    filters: [
+      { id: 'kanto', label: 'Kanto (Gen 1)', value: 'kanto' },
+      { id: 'johto', label: 'Johto (Gen 2)', value: 'johto' },
+      { id: 'hoenn', label: 'Hoenn (Gen 3)', value: 'hoenn' },
+      { id: 'sinnoh', label: 'Sinnoh (Gen 4)', value: 'sinnoh' },
+      { id: 'unova', label: 'Unova (Gen 5)', value: 'unova' },
+      { id: 'kalos', label: 'Kalos (Gen 6)', value: 'kalos' },
+      { id: 'alola', label: 'Alola (Gen 7)', value: 'alola' },
+      { id: 'galar', label: 'Galar (Gen 8)', value: 'galar' },
+      { id: 'paldea', label: 'Paldea (Gen 9)', value: 'paldea' },
+    ]
+  },
 };
 
 const PokemonGoSearchBuilder = () => {
@@ -258,6 +278,7 @@ const PokemonGoSearchBuilder = () => {
     time: false,
     size: false,
     moves: false,
+    regions: false,
   });
   const [filterSearch, setFilterSearch] = useState('');
   const [copySuccess, setCopySuccess] = useState(false);
