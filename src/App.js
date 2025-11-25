@@ -2,7 +2,7 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { 
   Search, Copy, X, ChevronDown, AlertTriangle, Check, 
   BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus,
-  Bookmark, BookmarkCheck, Trash2, Download, Upload
+  Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon
 } from 'lucide-react';
 
 // Validation function for Pokemon GO search strings
@@ -261,8 +261,17 @@ const PokemonGoSearchBuilder = () => {
   const [saveSearchName, setSaveSearchName] = useState('');
   const [showSavedSearches, setShowSavedSearches] = useState(false);
   const [showQuickSearches, setShowQuickSearches] = useState(false);
+  const [showCPRanges, setShowCPRanges] = useState(false);
   const [showPokemonSelection, setShowPokemonSelection] = useState(false);
   const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const stored = localStorage.getItem('pogoDarkMode');
+    if (stored !== null) {
+      return stored === 'true';
+    }
+    return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
@@ -296,6 +305,17 @@ const PokemonGoSearchBuilder = () => {
       }
     }
   }, [savedSearches]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('pogoDarkMode', JSON.stringify(isDarkMode));
+    } catch (err) {
+      console.error('Failed to persist theme preference:', err);
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.classList.toggle('dark', isDarkMode);
+    }
+  }, [isDarkMode]);
 
   // Cleanup toast timeout on unmount
   React.useEffect(() => {
@@ -850,6 +870,83 @@ const PokemonGoSearchBuilder = () => {
     setFilterSearch('');
   };
 
+  // Append filter combo to search string
+  const appendFilterCombo = (comboString) => {
+    setIsPremadeSearch(false);
+    
+    // Parse the combo string to get new filters (remove leading & if present)
+    const cleanCombo = comboString.startsWith('&') ? comboString.substring(1) : comboString;
+    const { included: newIncluded, excluded: newExcluded } = parseSearchStringToFilters(cleanCombo);
+    
+    // Merge with existing filters
+    setIncludedFilters(prev => {
+      const merged = [...prev, ...newIncluded];
+      // Remove duplicates
+      return [...new Set(merged)];
+    });
+    
+    setExcludedFilters(prev => {
+      const merged = [...prev, ...newExcluded];
+      // Remove duplicates
+      return [...new Set(merged)];
+    });
+    
+    // Append to search string
+    if (!searchString || searchString.trim() === '') {
+      setSearchString(cleanCombo);
+    } else {
+      const newSearchString = `${searchString}${comboString}`;
+      setSearchString(newSearchString);
+      // Preserve any Pokedex numbers
+      extractPokedexNumbers(newSearchString);
+    }
+  };
+
+  // Insert or replace CP range in search string
+  const insertCPRange = (cpRange) => {
+    setIsPremadeSearch(false);
+    
+    if (!searchString || searchString.trim() === '') {
+      // If search string is empty, just set the CP range
+      setSearchString(cpRange);
+      return;
+    }
+    
+    // Split by & to get parts
+    const parts = searchString.split('&').map(p => p.trim()).filter(p => p);
+    
+    // Find existing CP range (starts with "cp" followed by numbers and hyphens)
+    let cpIndex = -1;
+    for (let i = 0; i < parts.length; i++) {
+      if (/^cp[\d\-]+$/.test(parts[i])) {
+        cpIndex = i;
+        break;
+      }
+    }
+    
+    // Replace existing CP range or insert new one
+    if (cpIndex >= 0) {
+      // Replace existing CP range
+      parts[cpIndex] = cpRange;
+    } else {
+      // Insert CP range (after Pokedex numbers if they exist, otherwise at the beginning)
+      let insertIndex = 0;
+      for (let i = 0; i < parts.length; i++) {
+        // Check if this part is Pokedex numbers (digits, commas, and hyphens for ranges)
+        if (/^[\d,\-]+$/.test(parts[i])) {
+          insertIndex = i + 1;
+          break;
+        }
+      }
+      parts.splice(insertIndex, 0, cpRange);
+    }
+    
+    const newSearchString = parts.join('&');
+    setSearchString(newSearchString);
+    // Preserve any Pokedex numbers
+    extractPokedexNumbers(newSearchString);
+  };
+
   // Insert Pokemon numbers into search string
   const insertPokemonNumbers = (numbers) => {
     setIsPremadeSearch(false);
@@ -1003,21 +1100,26 @@ const PokemonGoSearchBuilder = () => {
 
   // Pokemon Generation and Group data
   const pokemonGenerations = [
-    { label: 'Gen 1', range: '1-151' },
-    { label: 'Gen 2', range: '152-251' },
-    { label: 'Gen 3', range: '252-386' },
-    { label: 'Gen 4', range: '387-493' },
-    { label: 'Gen 5', range: '494-649' },
-    { label: 'Gen 6', range: '650-721' },
-    { label: 'Gen 7', range: '722-809' },
-    { label: 'Gen 8', range: '810-905' },
+    { label: 'Gen 1 (Kanto)', range: '1-151' },
+    { label: 'Gen 2 (Johto)', range: '152-251' },
+    { label: 'Gen 3 (Hoenn)', range: '252-386' },
+    { label: 'Gen 4 (Sinnoh)', range: '387-493' },
+    { label: 'Gen 5 (Unova)', range: '494-649' },
+    { label: 'Gen 6 (Kalos)', range: '650-721' },
+    { label: 'Gen 7 (Alola)', range: '722-809' },
+    { label: 'Gen 8 (Galar)', range: '810-905' },
   ];
 
   const pokemonGroups = [
-    { label: 'All Starters', numbers: '1,4,7,152,155,158,252,255,258,387,390,393,495,498,501,650,653,656,722,725,728,810,813,816' },
-    { label: 'Kanto Starters', numbers: '1,4,7' },
-    { label: 'Johto Starters', numbers: '152,155,158' },
-    { label: 'Hoenn Starters', numbers: '252,255,258' },
+    { label: 'All Starters', numbers: '1,2,3,4,5,6,7,8,9,152,153,154,155,156,157,158,159,160,252,253,254,255,256,257,258,259,260,387,388,389,390,391,392,393,394,395,495,496,497,498,499,500,501,502,503,650,651,652,653,654,655,656,657,658,722,723,724,725,726,727,728,729,730,810,811,812,813,814,815,816,817,818' },
+    { label: 'Kanto Starters', numbers: '1,2,3,4,5,6,7,8,9' },
+    { label: 'Johto Starters', numbers: '152,153,154,155,156,157,158,159,160' },
+    { label: 'Hoenn Starters', numbers: '252,253,254,255,256,257,258,259,260' },
+    { label: 'Sinnoh Starters', numbers: '387,388,389,390,391,392,393,394,395' },
+    { label: 'Unova Starters', numbers: '495,496,497,498,499,500,501,502,503' },
+    { label: 'Kalos Starters', numbers: '650,651,652,653,654,655,656,657,658' },
+    { label: 'Alola Starters', numbers: '722,723,724,725,726,727,728,729,730' },
+    { label: 'Galar Starters', numbers: '810,811,812,813,814,815,816,817,818' },
     { label: 'Pseudo-Legendaries', numbers: '147,148,149,246,247,248,371,372,373,443,444,445,610,611,612,633,634,635,704,705,706,782,783,784,885,886,887' },
     { label: 'Eeveelutions', numbers: '133,134,135,136,196,197,470,471,700' },
   ];
@@ -1065,6 +1167,13 @@ const PokemonGoSearchBuilder = () => {
       searchString: '717,637,892,248,642,492,373,895,409,484,150,376,3,18,380,229,214,362,354,181,65,473,792,382,647,635,720,485,383,487,445,905,483,491,534,609,806,998&mega',
       tier: 'A',
       type: 'Non-Shadow'
+    },
+    top25MasterLeague: {
+      label: 'Top 25 Master League',
+      description: 'Top ranked Pokemon for Master League PvP competitive battling',
+      searchString: '888,484,889,483,646,644,643,249,376,890,800,792,250,383,381,648,671,468,791',
+      tier: 'PvP',
+      type: 'Master League'
     }
   };
 
@@ -1201,27 +1310,43 @@ const PokemonGoSearchBuilder = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-cyan-50/50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-cyan-50/50 text-slate-900 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100 transition-colors duration-300">
       <CopyToast />
       
       {/* Sticky Header with Output Section */}
-      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm">
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {/* Compact Header */}
-          <div className="mb-4">
-            <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0077BE] to-[#00A7E5] bg-clip-text text-transparent">
-              Pokémon GO Search Builder
-            </h1>
-            <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-              Build search strings visually
-            </p>
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0077BE] to-[#00A7E5] bg-clip-text text-transparent">
+                Pokémon GO Search Builder
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+                Build search strings visually
+              </p>
+            </div>
+            <button
+              onClick={() => setIsDarkMode(prev => !prev)}
+              aria-pressed={isDarkMode}
+              className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors self-start"
+            >
+              {isDarkMode ? (
+                <Sun className="w-4 h-4" />
+              ) : (
+                <Moon className="w-4 h-4" />
+              )}
+              <span className="hidden sm:inline">
+                {isDarkMode ? 'Light mode' : 'Dark mode'}
+              </span>
+            </button>
           </div>
 
           {/* Output Section - FOCAL POINT */}
-          <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50">
+          <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50 dark:from-slate-900 dark:to-slate-900/70 dark:border-slate-700 dark:shadow-slate-900/40">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <label className="text-sm font-bold text-gray-700">
+                <label className="text-sm font-bold text-gray-700 dark:text-slate-200">
                   Search String
                 </label>
                 {(includedFilters.length > 0 || excludedFilters.length > 0) && (
@@ -1246,12 +1371,14 @@ const PokemonGoSearchBuilder = () => {
                   </div>
                 )}
               </div>
-              <button
-                onClick={clearAll}
-                className="text-xs font-semibold text-gray-500 hover:text-red-500 transition-colors px-2 py-1"
-              >
-                Clear All
-              </button>
+              <div className="flex items-center justify-end">
+                <button
+                  onClick={clearAll}
+                  className="text-xs font-semibold text-gray-500 hover:text-red-500 transition-colors px-2 py-1 dark:text-slate-400 dark:hover:text-red-300"
+                >
+                  Clear All
+                </button>
+              </div>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-2">
@@ -1259,17 +1386,12 @@ const PokemonGoSearchBuilder = () => {
                 <input
                   type="text"
                   value={searchString}
-                  onChange={(e) => {
-                    const newValue = e.target.value;
-                    setSearchString(newValue);
-                    setIsPremadeSearch(false);
-                    extractPokedexNumbers(newValue);
-                  }}
+                  readOnly
                   placeholder="Your search string will appear here..."
-                  className={`w-full min-h-[48px] sm:min-h-[56px] px-4 py-3 border-2 rounded-xl focus:outline-none font-mono text-sm sm:text-base transition-all duration-200 ${
+                  className={`w-full min-h-[48px] sm:min-h-[56px] px-4 py-3 border-2 rounded-xl focus:outline-none font-mono text-sm sm:text-base transition-all duration-200 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 cursor-default ${
                     !validationResult.valid 
-                      ? 'border-amber-400 focus:border-amber-500 bg-amber-50/50' 
-                      : 'border-blue-200 focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 bg-white'
+                      ? 'border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 bg-amber-50/50 dark:bg-amber-950/30 dark:border-amber-500 dark:focus:ring-amber-500/40'
+                      : 'border-blue-200 focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:focus:border-cyan-400 dark:focus:ring-cyan-500/40'
                   }`}
                 />
                 {!validationResult.valid && (
@@ -1321,12 +1443,12 @@ const PokemonGoSearchBuilder = () => {
 
             {/* Conflicts Warning */}
             {conflicts.length > 0 && (
-              <div className="mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg flex items-start gap-2 animate-pulse-warning">
+              <div className="mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg flex items-start gap-2 animate-pulse-warning dark:bg-amber-950/30 dark:border-amber-500">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-bold text-amber-800 text-sm mb-1">⚠️ Conflicting Filters</p>
+                  <p className="font-bold text-amber-800 text-sm mb-1 dark:text-amber-200">⚠️ Conflicting Filters</p>
                   {conflicts.map((conflict, idx) => (
-                    <p key={idx} className="text-xs text-amber-700">{conflict}</p>
+                    <p key={idx} className="text-xs text-amber-700 dark:text-amber-100">{conflict}</p>
                   ))}
                 </div>
               </div>
@@ -1340,7 +1462,7 @@ const PokemonGoSearchBuilder = () => {
 
         {/* Active Filter Chips - Compact Display */}
         {(includedFilters.length > 0 || excludedFilters.length > 0) && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-slate-800">
             <div className="flex flex-wrap gap-2">
               {includedFilters.map(filterId => {
                 const isRemoving = removingChip === filterId;
@@ -1390,24 +1512,24 @@ const PokemonGoSearchBuilder = () => {
 
         {/* Saved Searches - Collapsible Section */}
         {savedSearches.length > 0 && (
-          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-purple-100">
+          <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-purple-100 dark:bg-slate-900/70 dark:border-purple-500/30">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowSavedSearches(!showSavedSearches)}
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
-                  <h3 className="text-base sm:text-lg font-bold text-gray-800">Saved Searches</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">Saved Searches</h3>
                   <ChevronDown 
                     className={`w-5 h-5 transition-transform duration-300 ${showSavedSearches ? 'rotate-180' : ''}`}
                   />
                 </button>
-                <span className="px-2 py-0.5 bg-purple-200 text-purple-800 text-xs font-bold rounded-full">
+                <span className="px-2 py-0.5 bg-purple-200 text-purple-800 text-xs font-bold rounded-full dark:bg-purple-500/30 dark:text-purple-100">
                   {savedSearches.length}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <label className="cursor-pointer p-2 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation" title="Import searches">
+                <label className="cursor-pointer p-2 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation dark:hover:bg-slate-800" title="Import searches">
                   <Upload className="w-4 h-4 text-purple-600" />
                   <input
                     type="file"
@@ -1419,7 +1541,7 @@ const PokemonGoSearchBuilder = () => {
                 {savedSearches.length > 0 && (
                   <button
                     onClick={exportSavedSearches}
-                    className="p-2 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation"
+                    className="p-2 hover:bg-purple-50 rounded-lg transition-colors touch-manipulation dark:hover:bg-slate-800"
                     title="Export searches"
                   >
                     <Download className="w-4 h-4 text-purple-600" />
@@ -1433,16 +1555,16 @@ const PokemonGoSearchBuilder = () => {
                 {savedSearches.map((saved) => (
                   <div
                     key={saved.id}
-                    className="group flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all duration-200"
+                    className="group flex items-center gap-3 p-3 bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 rounded-xl hover:border-purple-300 hover:shadow-md transition-all duration-200 dark:from-slate-900 dark:to-slate-900/60 dark:border-purple-500/40 dark:hover:border-purple-400/50"
                   >
                     <div 
                       className="flex-1 min-w-0 cursor-pointer"
                       onClick={() => loadSavedSearch(saved)}
                     >
-                      <div className="font-semibold text-sm text-gray-800 mb-1 truncate">
+                      <div className="font-semibold text-sm text-gray-800 dark:text-slate-100 mb-1 truncate">
                         {saved.name}
                       </div>
-                      <div className="text-xs text-gray-600 font-mono truncate">
+                      <div className="text-xs text-gray-600 dark:text-slate-400 font-mono truncate">
                         {saved.searchString}
                       </div>
                     </div>
@@ -1469,142 +1591,352 @@ const PokemonGoSearchBuilder = () => {
           </div>
         )}
 
-        {/* Premade Searches - Collapsible Section */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-blue-100">
+        {/* Quick Searches - Collapsible Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-blue-500/30">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setShowQuickSearches(!showQuickSearches)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Quick Searches</h3>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">Quick Searches</h3>
                 <ChevronDown 
                   className={`w-5 h-5 transition-transform duration-300 ${showQuickSearches ? 'rotate-180' : ''}`}
                 />
               </button>
             </div>
-            <p className="text-xs text-gray-500 hidden sm:block">Raid tier attackers from Pokemon GO Hub</p>
+            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">Raid tiers, PvP, and common combos</p>
           </div>
 
           {showQuickSearches && (
             <div className="saved-searches-expand">
-              <div className="mb-3 p-3 bg-blue-50/80 border border-blue-200 rounded-lg">
-                <p className="text-xs text-blue-800 font-semibold mb-1">ℹ️ Shadow vs Non-Shadow</p>
-                <p className="text-xs text-blue-700 leading-relaxed">
-                  Pokemon GO cannot display Shadow and non-Shadow versions simultaneously. Use separate searches.
-                </p>
-              </div>
-              
-              {/* S-Tier */}
-              <div className="mb-4">
-                <h4 className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">S-Tier • Apex of Power</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                  <button
-                    onClick={(e) => applyPremadeSearch('sTierShadow', e)}
-                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm sm:text-base text-red-800">
-                        {premadeSearches.sTierShadow.label}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+              {/* PvP & Competitive Subsection */}
+              <div className="mb-6">
+                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">PvP & Competitive</h3>
+                
+                {/* Raid Tier Attackers */}
+                <div className="mb-5">
+                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Raid Tier Attackers</h4>
+                  <div className="mb-3 p-3 bg-blue-50/80 border border-blue-200 rounded-lg dark:bg-slate-900/60 dark:border-blue-500/30">
+                    <p className="text-xs text-blue-800 font-semibold mb-1 dark:text-blue-200">ℹ️ Shadow vs Non-Shadow</p>
+                    <p className="text-xs text-blue-700 leading-relaxed dark:text-blue-100">
+                      Pokemon GO cannot display Shadow and non-Shadow versions simultaneously. Use separate searches.
+                    </p>
+                  </div>
+                  
+                  {/* S-Tier */}
+                  <div className="mb-4">
+                    <h5 className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">S-Tier • Apex of Power</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <button
+                        onClick={(e) => applyPremadeSearch('sTierShadow', e)}
+                        className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm sm:text-base text-red-800">
+                            {premadeSearches.sTierShadow.label}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-red-700">
+                          {premadeSearches.sTierShadow.description}
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => applyPremadeSearch('sTierNonShadow', e)}
+                        className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm sm:text-base text-amber-800">
+                            {premadeSearches.sTierNonShadow.label}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full font-bold">MEGA/PRIMAL</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-amber-700">
+                          {premadeSearches.sTierNonShadow.description}
+                        </div>
+                      </button>
                     </div>
-                    <div className="text-[10px] sm:text-xs text-red-700">
-                      {premadeSearches.sTierShadow.description}
+                  </div>
+
+                  {/* A+ Tier */}
+                  <div className="mb-4">
+                    <h5 className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">A+ Tier • Stand at or Near the Top</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <button
+                        onClick={(e) => applyPremadeSearch('aPlusTierShadow', e)}
+                        className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm sm:text-base text-red-800">
+                            {premadeSearches.aPlusTierShadow.label}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-red-700">
+                          {premadeSearches.aPlusTierShadow.description}
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => applyPremadeSearch('aPlusTierNonShadow', e)}
+                        className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm sm:text-base text-blue-800">
+                            {premadeSearches.aPlusTierNonShadow.label}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded-full font-bold">MEGA</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-blue-700">
+                          {premadeSearches.aPlusTierNonShadow.description}
+                        </div>
+                      </button>
                     </div>
-                  </button>
-                  <button
-                    onClick={(e) => applyPremadeSearch('sTierNonShadow', e)}
-                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm sm:text-base text-amber-800">
-                        {premadeSearches.sTierNonShadow.label}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full font-bold">MEGA/PRIMAL</span>
+                  </div>
+
+                  {/* A Tier */}
+                  <div className="mb-4">
+                    <h5 className="text-xs font-bold text-emerald-700 mb-2 uppercase tracking-wide">A Tier • Gold-Standard Investment</h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                      <button
+                        onClick={(e) => applyPremadeSearch('aTierShadow', e)}
+                        className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm sm:text-base text-red-800">
+                            {premadeSearches.aTierShadow.label}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-red-700">
+                          {premadeSearches.aTierShadow.description}
+                        </div>
+                      </button>
+                      <button
+                        onClick={(e) => applyPremadeSearch('aTierNonShadow', e)}
+                        className="group relative p-3 sm:p-4 rounded-xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-sm sm:text-base text-emerald-800">
+                            {premadeSearches.aTierNonShadow.label}
+                          </span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded-full font-bold">MEGA</span>
+                        </div>
+                        <div className="text-[10px] sm:text-xs text-emerald-700">
+                          {premadeSearches.aTierNonShadow.description}
+                        </div>
+                      </button>
                     </div>
-                    <div className="text-[10px] sm:text-xs text-amber-700">
-                      {premadeSearches.sTierNonShadow.description}
-                    </div>
-                  </button>
+                  </div>
+                </div>
+
+                {/* Master League PvP */}
+                <div>
+                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">Master League PvP</h4>
+                  <div className="mb-3 p-3 bg-indigo-50/80 border border-indigo-200 rounded-lg dark:bg-slate-900/60 dark:border-indigo-500/30">
+                    <p className="text-xs text-indigo-800 font-semibold mb-1 dark:text-indigo-200">ℹ️ Master League Rankings</p>
+                    <p className="text-xs text-indigo-700 leading-relaxed dark:text-indigo-100">
+                      Based on Master League PvP rankings for competitive battling. Includes top-ranked Pokemon like Zacian (Crowned Sword), Palkia (Origin & Shadow), Zamazenta (Crowned Shield), Dialga (Origin & Shadow), Kyurem (White & Black), Zekrom, Reshiram, Lugia, Metagross, Eternatus, Necrozma, Lunala, Ho-Oh, Groudon, Latios, Meloetta, Florges, Togekiss, and Solgaleo.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                    <button
+                      onClick={(e) => applyPremadeSearch('top25MasterLeague', e)}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-indigo-300 bg-gradient-to-br from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-bold text-sm sm:text-base text-indigo-800">
+                          {premadeSearches.top25MasterLeague.label}
+                        </span>
+                        <span className="text-[10px] px-1.5 py-0.5 bg-indigo-200 text-indigo-800 rounded-full font-bold">PvP</span>
+                      </div>
+                      <div className="text-[10px] sm:text-xs text-indigo-700">
+                        {premadeSearches.top25MasterLeague.description}
+                      </div>
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* A+ Tier */}
-              <div className="mb-4">
-                <h4 className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">A+ Tier • Stand at or Near the Top</h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                  <button
-                    onClick={(e) => applyPremadeSearch('aPlusTierShadow', e)}
-                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm sm:text-base text-red-800">
-                        {premadeSearches.aPlusTierShadow.label}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-red-700">
-                      {premadeSearches.aPlusTierShadow.description}
-                    </div>
-                  </button>
-                  <button
-                    onClick={(e) => applyPremadeSearch('aPlusTierNonShadow', e)}
-                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm sm:text-base text-blue-800">
-                        {premadeSearches.aPlusTierNonShadow.label}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded-full font-bold">MEGA</span>
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-blue-700">
-                      {premadeSearches.aPlusTierNonShadow.description}
-                    </div>
-                  </button>
-                </div>
-              </div>
-
-              {/* A Tier */}
+              {/* Common Combos Subsection */}
               <div>
-                <h4 className="text-xs font-bold text-emerald-700 mb-2 uppercase tracking-wide">A Tier • Gold-Standard Investment</h4>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">Common Combos</h3>
+                <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">Quick Combos</h4>
+                <div className="mb-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg dark:bg-slate-900/60 dark:border-purple-500/30">
+                  <p className="text-xs text-purple-800 font-semibold mb-1 dark:text-purple-200">ℹ️ Quick Combos</p>
+                  <p className="text-xs text-purple-700 leading-relaxed dark:text-purple-100">
+                    These buttons append filter combinations to your existing search string, allowing you to stack multiple combos together.
+                  </p>
+                </div>
+                
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                  <button
-                    onClick={(e) => applyPremadeSearch('aTierShadow', e)}
-                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm sm:text-base text-red-800">
-                        {premadeSearches.aTierShadow.label}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-red-700">
-                      {premadeSearches.aTierShadow.description}
-                    </div>
-                  </button>
-                  <button
-                    onClick={(e) => applyPremadeSearch('aTierNonShadow', e)}
-                    className="group relative p-3 sm:p-4 rounded-xl border-2 border-emerald-300 bg-gradient-to-br from-emerald-50 to-green-50 hover:from-emerald-100 hover:to-green-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                  >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-bold text-sm sm:text-base text-emerald-800">
-                        {premadeSearches.aTierNonShadow.label}
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded-full font-bold">MEGA</span>
-                    </div>
-                    <div className="text-[10px] sm:text-xs text-emerald-700">
-                      {premadeSearches.aTierNonShadow.description}
-                    </div>
-                  </button>
+                  <Tooltip text="All shiny legendary Pokemon">
+                    <button
+                      onClick={() => appendFilterCombo('&shiny&legendary')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-white mb-1">Shiny Legendaries</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-100">All shiny legendary Pokemon</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="100% IV shadow Pokemon">
+                    <button
+                      onClick={() => appendFilterCombo('&4*&shadow')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Perfect Shadows</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">100% IV shadow Pokemon</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="3-4★ Pokemon that aren't shiny">
+                    <button
+                      onClick={() => appendFilterCombo('&3*,4*&!shiny')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">High IV Non-Shiny</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">3-4★ Pokemon that aren't shiny</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="Low IV non-favorites for trading">
+                    <button
+                      onClick={() => appendFilterCombo('&!favorite&!shiny&0*,1*')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Trade Fodder</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Low IV non-favorites for trading</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="Pokemon caught in the last week">
+                    <button
+                      onClick={() => appendFilterCombo('&age0-7')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Recent Catches</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Pokemon caught in the last week</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="Can evolve, not favorited">
+                    <button
+                      onClick={() => appendFilterCombo('&evolve&!favorite')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Evolution Ready</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Can evolve, not favorited</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="Shiny Pokemon with costumes">
+                    <button
+                      onClick={() => appendFilterCombo('&shiny&costume')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Shiny Costume</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Shiny Pokemon with costumes</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text="Legendaries you haven't found shiny">
+                    <button
+                      onClick={() => appendFilterCombo('&legendary&!shiny')}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Legendary Non-Shiny</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Legendaries you haven't found shiny</div>
+                    </button>
+                  </Tooltip>
                 </div>
               </div>
             </div>
           )}
         </div>
 
+
+        {/* CP Ranges - Collapsible Section */}
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-violet-100 dark:bg-slate-900/70 dark:border-violet-500/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowCPRanges(!showCPRanges)}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
+                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">CP Ranges</h3>
+                <ChevronDown 
+                  className={`w-5 h-5 transition-transform duration-300 ${showCPRanges ? 'rotate-180' : ''}`}
+                />
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">Insert CP ranges for PvP leagues</p>
+          </div>
+
+          {showCPRanges && (
+            <div className="saved-searches-expand">
+              <div className="mb-3 p-3 bg-violet-50/80 border border-violet-200 rounded-lg dark:bg-slate-900/60 dark:border-violet-500/30">
+                <p className="text-xs text-violet-800 font-semibold mb-1 dark:text-violet-200">ℹ️ PvP League CP Caps</p>
+                <p className="text-xs text-violet-700 leading-relaxed dark:text-violet-100">
+                  These are the competitive PvP league CP caps used in Pokemon GO. Clicking a button will insert or replace the CP range in your search string.
+                </p>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                <button
+                  onClick={() => insertCPRange('cp0-1500')}
+                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                >
+                  <div className="font-bold text-sm sm:text-base text-violet-800 mb-1">Great League</div>
+                  <div className="text-[10px] sm:text-xs text-violet-600 font-mono">CP 0-1500</div>
+                </button>
+
+                <button
+                  onClick={() => insertCPRange('cp0-2500')}
+                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                >
+                  <div className="font-bold text-sm sm:text-base text-blue-800 mb-1">Ultra League</div>
+                  <div className="text-[10px] sm:text-xs text-blue-600 font-mono">CP 0-2500</div>
+                </button>
+
+                <button
+                  onClick={() => insertCPRange('cp2500-')}
+                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                >
+                  <div className="font-bold text-sm sm:text-base text-amber-800 mb-1">Master League</div>
+                  <div className="text-[10px] sm:text-xs text-amber-600 font-mono">CP 2500+</div>
+                </button>
+
+                <button
+                  onClick={() => insertCPRange('cp0-500')}
+                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                >
+                  <div className="font-bold text-sm sm:text-base text-green-800 mb-1">Under 500 CP</div>
+                  <div className="text-[10px] sm:text-xs text-green-600 font-mono">CP 0-500</div>
+                </button>
+
+                <button
+                  onClick={() => insertCPRange('cp3000-')}
+                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                >
+                  <div className="font-bold text-sm sm:text-base text-orange-800 mb-1">High CP</div>
+                  <div className="text-[10px] sm:text-xs text-orange-600 font-mono">CP 3000+</div>
+                </button>
+
+                <button
+                  onClick={() => insertCPRange('cp4000-')}
+                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                >
+                  <div className="font-bold text-sm sm:text-base text-red-800 mb-1">Perfect CP</div>
+                  <div className="text-[10px] sm:text-xs text-red-600 font-mono">CP 4000+</div>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Pokemon Selection Buttons - Collapsible Section */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-green-100">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-green-100 dark:bg-slate-900/70 dark:border-green-500/30">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
@@ -1617,23 +1949,23 @@ const PokemonGoSearchBuilder = () => {
                 />
               </button>
             </div>
-            <p className="text-xs text-gray-500 hidden sm:block">Quick insert Pokemon ranges and groups</p>
+            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">Quick insert Pokemon ranges and groups</p>
           </div>
 
           {showPokemonSelection && (
             <div className="saved-searches-expand">
               {/* Generation Buttons */}
               <div className="mb-4">
-                <h4 className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">Generations</h4>
+                <h4 className="text-xs font-bold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">Generations</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                   {pokemonGenerations.map((gen) => (
                     <button
                       key={gen.label}
                       onClick={() => insertPokemonNumbers(gen.range)}
-                      className="px-3 py-2 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      className="px-3 py-2 bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-200 rounded-lg hover:from-green-100 hover:to-emerald-100 hover:border-green-300 transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation dark:from-slate-900 dark:to-slate-900/60 dark:border-emerald-500/40 dark:hover:border-emerald-400/60"
                     >
-                      <div className="font-bold text-sm text-green-800 mb-0.5">{gen.label}</div>
-                      <div className="text-[10px] text-green-600 font-mono">{gen.range}</div>
+                      <div className="font-bold text-sm text-green-800 dark:text-emerald-200 mb-0.5">{gen.label}</div>
+                      <div className="text-[10px] text-green-600 dark:text-emerald-100 font-mono">{gen.range}</div>
                     </button>
                   ))}
                 </div>
@@ -1641,16 +1973,16 @@ const PokemonGoSearchBuilder = () => {
 
               {/* Pokemon Group Buttons */}
               <div>
-                <h4 className="text-xs font-bold text-gray-700 mb-3 uppercase tracking-wide">Pokemon Groups</h4>
+                <h4 className="text-xs font-bold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">Pokemon Groups</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {pokemonGroups.map((group) => (
                     <button
                       key={group.label}
                       onClick={() => insertPokemonNumbers(group.numbers)}
-                      className="px-3 py-2 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                      className="px-3 py-2 bg-gradient-to-br from-purple-50 to-pink-50 border-2 border-purple-200 rounded-lg hover:from-purple-100 hover:to-pink-100 hover:border-purple-300 transition-all duration-200 hover:shadow-md hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation dark:from-slate-900 dark:to-slate-900/60 dark:border-purple-500/40 dark:hover:border-purple-400/50"
                     >
-                      <div className="font-bold text-sm text-purple-800 mb-0.5">{group.label}</div>
-                      <div className="text-[10px] text-purple-600 font-mono truncate" title={group.numbers}>
+                      <div className="font-bold text-sm text-purple-800 dark:text-purple-100 mb-0.5">{group.label}</div>
+                      <div className="text-[10px] text-purple-600 dark:text-purple-200 font-mono truncate" title={group.numbers}>
                         {group.numbers.length > 40 ? `${group.numbers.substring(0, 40)}...` : group.numbers}
                       </div>
                     </button>
@@ -1661,24 +1993,25 @@ const PokemonGoSearchBuilder = () => {
           )}
         </div>
 
+
         {/* Filter Search */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100">
+        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-blue-500/30">
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400 dark:text-slate-500" />
             <input
               type="text"
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
               placeholder="Search filters... (e.g., 'shiny', 'attack', 'mega')"
-              className="w-full pl-12 pr-12 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base transition-all duration-200 bg-white"
+              className="w-full pl-12 pr-12 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base transition-all duration-200 bg-white text-slate-900 dark:text-slate-100 dark:bg-slate-900 dark:border-slate-700 dark:focus:border-cyan-400 dark:focus:ring-cyan-500/40 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
             {filterSearch && (
               <button
                 onClick={clearSearch}
-                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1.5 hover:bg-gray-100 rounded-lg transition-colors touch-manipulation dark:hover:bg-slate-800"
                 aria-label="Clear search"
               >
-                <X className="w-4 h-4 text-gray-500" />
+                <X className="w-4 h-4 text-gray-500 dark:text-slate-400" />
               </button>
             )}
           </div>
@@ -1695,7 +2028,7 @@ const PokemonGoSearchBuilder = () => {
             ).length;
             
             return (
-              <div key={key} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow duration-200">
+              <div key={key} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow duration-200 dark:bg-slate-900/70 dark:border-slate-800 dark:hover:shadow-slate-900/40">
                 {/* Category Header */}
                 <button
                   onClick={() => toggleCategory(key)}
@@ -1724,8 +2057,8 @@ const PokemonGoSearchBuilder = () => {
 
                 {/* Category Content - Smooth Expand */}
                 {isExpanded && (
-                  <div className="category-expand p-4 sm:p-5 bg-white">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                  <div className="category-expand p-4 sm:p-5 bg-white dark:bg-slate-950/60">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {category.filters.map(filter => {
                         const isIncluded = includedFilters.includes(filter.id);
                         const isExcluded = excludedFilters.includes(filter.id);
@@ -1735,14 +2068,14 @@ const PokemonGoSearchBuilder = () => {
                             <div
                               className={`group flex items-center gap-2 p-3 min-h-[48px] rounded-xl transition-all duration-200 border-2 cursor-pointer touch-manipulation ${
                                 isIncluded 
-                                  ? 'bg-blue-50 border-blue-400 shadow-sm' 
+                                  ? 'bg-blue-50 border-blue-400 shadow-sm dark:bg-blue-500/10 dark:border-blue-400/60'
                                   : isExcluded
-                                  ? 'bg-red-50 border-red-400 shadow-sm'
-                                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:shadow-sm'
+                                  ? 'bg-red-50 border-red-400 shadow-sm dark:bg-red-500/10 dark:border-red-400/60'
+                                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:shadow-sm dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:border-slate-600'
                               }`}
                             >
                               <span className={`text-sm font-medium flex-1 ${
-                                isIncluded ? 'text-blue-800' : isExcluded ? 'text-red-800' : 'text-gray-800'
+                                isIncluded ? 'text-blue-800 dark:text-blue-200' : isExcluded ? 'text-red-800 dark:text-red-200' : 'text-gray-800 dark:text-slate-100'
                               }`}>
                                 {filter.label}
                               </span>
@@ -1793,7 +2126,7 @@ const PokemonGoSearchBuilder = () => {
         </div>
 
         {/* Footer */}
-        <div className="mt-8 mb-6 text-center text-gray-500 text-xs sm:text-sm">
+        <div className="mt-8 mb-6 text-center text-gray-500 text-xs sm:text-sm dark:text-slate-500">
           <p>Built for Pokémon GO trainers 🎮</p>
         </div>
       </div>
@@ -1810,22 +2143,22 @@ const PokemonGoSearchBuilder = () => {
           }}
         >
           <div 
-            className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 animate-modal-slide-up"
+            className="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 max-w-md w-full mx-4 animate-modal-slide-up dark:bg-slate-900 dark:shadow-slate-900/60"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-xl font-bold text-gray-800">Save Search</h3>
+              <h3 className="text-xl font-bold text-gray-800 dark:text-slate-100">Save Search</h3>
               <button
                 onClick={() => {
                   setShowSaveModal(false);
                   setSaveSearchName('');
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors dark:hover:bg-slate-800"
               >
-                <X className="w-5 h-5 text-gray-500" />
+                <X className="w-5 h-5 text-gray-500 dark:text-slate-400" />
               </button>
             </div>
-            <p className="text-sm text-gray-600 mb-4">
+            <p className="text-sm text-gray-600 dark:text-slate-400 mb-4">
               Give your search a name to save it for later.
             </p>
             <input
@@ -1841,7 +2174,7 @@ const PokemonGoSearchBuilder = () => {
                 }
               }}
               placeholder="e.g., Perfect IV Shadows"
-              className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base mb-4"
+              className="w-full px-4 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base mb-4 bg-white text-slate-900 dark:bg-slate-900 dark:text-slate-100 dark:border-slate-700 dark:focus:border-cyan-400 dark:focus:ring-cyan-500/40 placeholder:text-slate-400 dark:placeholder:text-slate-500"
               autoFocus
             />
             <div className="flex gap-3">
@@ -1850,7 +2183,7 @@ const PokemonGoSearchBuilder = () => {
                   setShowSaveModal(false);
                   setSaveSearchName('');
                 }}
-                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors"
+                className="flex-1 px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold transition-colors dark:bg-slate-800 dark:hover:bg-slate-700 dark:text-slate-100"
               >
                 Cancel
               </button>
