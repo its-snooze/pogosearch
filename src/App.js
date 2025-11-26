@@ -4,6 +4,7 @@ import {
   BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus,
   Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon, Globe
 } from 'lucide-react';
+import { translateSearchString, translateTerm, translateToEnglish, getAvailableLanguages, getLocale } from './utils/translation';
 
 // Validation function for Pokemon GO search strings
 function validateSearchString(str) {
@@ -360,6 +361,12 @@ const PokemonGoSearchBuilder = () => {
     }
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
+  const [selectedLanguage, setSelectedLanguage] = useState(() => {
+    if (typeof window === 'undefined') return 'English';
+    const stored = localStorage.getItem('pogoLanguage');
+    return stored || 'English';
+  });
+  const [translationWarnings, setTranslationWarnings] = useState([]);
   const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
@@ -537,6 +544,7 @@ const PokemonGoSearchBuilder = () => {
   // - Exclamation (!) for NOT (goes before the term)
   // - Star ratings are mutually exclusive (only one can be selected)
   // - Pokedex numbers are preserved from ref (extracted from search string)
+  // - Terms are translated to selected language before output
   const buildSearchString = useCallback((included, excluded) => {
     // Get filter objects for included and excluded
     const getFilterObject = (id) => {
@@ -760,7 +768,12 @@ const PokemonGoSearchBuilder = () => {
     // CRITICAL: Join with & (no spaces) - this ensures Pokedex numbers and filters are separated by &
     if (finalParts.length === 0) return '';
     
-    const result = finalParts.join('&');
+    let result = finalParts.join('&');
+    
+    // Translate the search string to the selected language
+    if (selectedLanguage !== 'English' && result) {
+      result = translateSearchString(result, selectedLanguage);
+    }
     
     // Validate the generated search string as a safety check
     const validation = validateSearchString(result);
@@ -769,7 +782,44 @@ const PokemonGoSearchBuilder = () => {
     }
     
     return result;
-  }, []);
+  }, [selectedLanguage]);
+
+  // Save language preference to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('pogoLanguage', selectedLanguage);
+  }, [selectedLanguage]);
+
+  // Helper function to translate and set search string (for manual insertions)
+  const setTranslatedSearchString = useCallback((englishString) => {
+    if (!englishString) {
+      setSearchString('');
+      setTranslationWarnings([]);
+      return;
+    }
+    
+    if (selectedLanguage !== 'English') {
+      const translationResult = translateSearchString(englishString, selectedLanguage, true);
+      setSearchString(translationResult.translated);
+      setTranslationWarnings(translationResult.warnings);
+    } else {
+      setSearchString(englishString);
+      setTranslationWarnings([]);
+    }
+  }, [selectedLanguage]);
+
+  // Update warnings when search string or language changes
+  React.useEffect(() => {
+    if (selectedLanguage !== 'English' && searchString) {
+      // Get the English version first (if it's already translated, translate back)
+      const englishString = translateToEnglish(searchString, selectedLanguage);
+      
+      // Then translate to get warnings
+      const translationResult = translateSearchString(englishString, selectedLanguage, true);
+      setTranslationWarnings(translationResult.warnings);
+    } else {
+      setTranslationWarnings([]);
+    }
+  }, [searchString, selectedLanguage]);
 
   // Update search string when filters change (but not if it's a premade search)
   React.useEffect(() => {
@@ -847,12 +897,14 @@ const PokemonGoSearchBuilder = () => {
     setIncludedFilters([]);
     setExcludedFilters([]);
     setSearchString('');
+    setTranslationWarnings([]);
     setIsPremadeSearch(false);
     pokedexNumbersRef.current = ''; // Clear Pokedex numbers ref
   };
 
   // Parse search string to extract filter IDs (included and excluded)
   // Handles Pokemon GO syntax: filters separated by &, comma-separated values within parts
+  // Also handles translated search strings by converting them to English first
   const parseSearchStringToFilters = (searchStr) => {
     const includedIds = [];
     const excludedIds = [];
@@ -861,8 +913,16 @@ const PokemonGoSearchBuilder = () => {
       return { included: includedIds, excluded: excludedIds };
     }
     
+    // Translate to English first if needed (for parsing)
+    // This allows users to paste translated strings and have them parsed correctly
+    let englishSearchStr = searchStr;
+    if (selectedLanguage !== 'English') {
+      // Try to translate back to English for parsing
+      englishSearchStr = translateToEnglish(searchStr, selectedLanguage);
+    }
+    
     // Split by & to get filter parts (no spaces)
-    const parts = searchStr.split('&').map(p => p.trim()).filter(p => p);
+    const parts = englishSearchStr.split('&').map(p => p.trim()).filter(p => p);
     
     // Process each part
     parts.forEach(part => {
@@ -880,7 +940,7 @@ const PokemonGoSearchBuilder = () => {
         const isExcluded = filterValue.startsWith('!');
         const cleanValue = isExcluded ? filterValue.substring(1) : filterValue;
         
-        // Find the filter ID that matches this value
+        // Find the filter ID that matches this value (using English values)
         const filter = Object.values(filterCategories)
           .flatMap(cat => cat.filters)
           .find(f => f.value === cleanValue);
@@ -983,13 +1043,19 @@ const PokemonGoSearchBuilder = () => {
     });
     
     // Append to search string
+    // Note: cleanCombo and comboString are already in English (from filter values)
+    // We need to translate them if language is not English
     if (!searchString || searchString.trim() === '') {
-      setSearchString(cleanCombo);
+      setTranslatedSearchString(cleanCombo);
     } else {
-      const newSearchString = `${searchString}${comboString}`;
-      setSearchString(newSearchString);
+      // Translate current search string back to English, append, then translate
+      const currentEnglish = selectedLanguage !== 'English' 
+        ? translateToEnglish(searchString, selectedLanguage) 
+        : searchString;
+      const newEnglishString = `${currentEnglish}${comboString}`;
+      setTranslatedSearchString(newEnglishString);
       // Preserve any Pokedex numbers
-      extractPokedexNumbers(newSearchString);
+      extractPokedexNumbers(newEnglishString);
     }
   };
 
@@ -997,14 +1063,19 @@ const PokemonGoSearchBuilder = () => {
   const insertCPRange = (cpRange) => {
     setIsPremadeSearch(false);
     
-    if (!searchString || searchString.trim() === '') {
+    // CP range is language-independent (starts with "cp"), so we can work with English version
+    const currentEnglish = selectedLanguage !== 'English' 
+      ? translateToEnglish(searchString, selectedLanguage) 
+      : searchString;
+    
+    if (!currentEnglish || currentEnglish.trim() === '') {
       // If search string is empty, just set the CP range
-      setSearchString(cpRange);
+      setTranslatedSearchString(cpRange);
       return;
     }
     
     // Split by & to get parts
-    const parts = searchString.split('&').map(p => p.trim()).filter(p => p);
+    const parts = currentEnglish.split('&').map(p => p.trim()).filter(p => p);
     
     // Find existing CP range (starts with "cp" followed by numbers and hyphens)
     let cpIndex = -1;
@@ -1032,25 +1103,30 @@ const PokemonGoSearchBuilder = () => {
       parts.splice(insertIndex, 0, cpRange);
     }
     
-    const newSearchString = parts.join('&');
-    setSearchString(newSearchString);
+    const newEnglishString = parts.join('&');
+    setTranslatedSearchString(newEnglishString);
     // Preserve any Pokedex numbers
-    extractPokedexNumbers(newSearchString);
+    extractPokedexNumbers(newEnglishString);
   };
 
   // Insert Pokemon numbers into search string
   const insertPokemonNumbers = (numbers) => {
     setIsPremadeSearch(false);
     
-    if (!searchString || searchString.trim() === '') {
+    // Pokedex numbers are language-independent, so we can work with English version
+    const currentEnglish = selectedLanguage !== 'English' 
+      ? translateToEnglish(searchString, selectedLanguage) 
+      : searchString;
+    
+    if (!currentEnglish || currentEnglish.trim() === '') {
       // If search string is empty, just set the numbers
-      setSearchString(numbers);
+      setTranslatedSearchString(numbers);
       extractPokedexNumbers(numbers);
       return;
     }
     
     // Split by & to get parts
-    const parts = searchString.split('&').map(p => p.trim()).filter(p => p);
+    const parts = currentEnglish.split('&').map(p => p.trim()).filter(p => p);
     
     // Find the Pokedex number part (all digits and commas, or ranges)
     let pokedexIndex = -1;
@@ -1070,14 +1146,14 @@ const PokemonGoSearchBuilder = () => {
       // Merge existing numbers with new numbers using comma
       const merged = existingPokedex ? `${existingPokedex},${numbers}` : numbers;
       parts[pokedexIndex] = merged;
-      const newSearchString = parts.join('&');
-      setSearchString(newSearchString);
-      extractPokedexNumbers(newSearchString);
+      const newEnglishString = parts.join('&');
+      setTranslatedSearchString(newEnglishString);
+      extractPokedexNumbers(newEnglishString);
     } else {
       // No existing Pokedex numbers, prepend them
-      const newSearchString = `${numbers}&${searchString}`;
-      setSearchString(newSearchString);
-      extractPokedexNumbers(newSearchString);
+      const newEnglishString = `${numbers}&${currentEnglish}`;
+      setTranslatedSearchString(newEnglishString);
+      extractPokedexNumbers(newEnglishString);
     }
   };
 
@@ -1127,9 +1203,23 @@ const PokemonGoSearchBuilder = () => {
   };
 
   const loadSavedSearch = (savedSearch) => {
-    const { included, excluded } = parseSearchStringToFilters(savedSearch.searchString);
-    extractPokedexNumbers(savedSearch.searchString);
-    setSearchString(savedSearch.searchString);
+    // Saved search string might be in any language - translate to English for parsing
+    const englishString = selectedLanguage !== 'English'
+      ? translateToEnglish(savedSearch.searchString, selectedLanguage)
+      : savedSearch.searchString;
+    
+    const { included, excluded } = parseSearchStringToFilters(englishString);
+    extractPokedexNumbers(englishString);
+    
+    // If the saved search was in a different language, translate it to current language
+    // Otherwise, if it's already in current language, use it as-is
+    if (selectedLanguage !== 'English') {
+      setTranslatedSearchString(englishString);
+    } else {
+      setSearchString(englishString);
+      setTranslationWarnings([]);
+    }
+    
     setIncludedFilters(included);
     setExcludedFilters(excluded);
     setIsPremadeSearch(true);
@@ -1280,11 +1370,11 @@ const PokemonGoSearchBuilder = () => {
       // Extract and preserve Pokedex numbers from the premade search string
       extractPokedexNumbers(preset.searchString);
       
-      // Parse the search string to extract filter tags
+      // Parse the search string to extract filter tags (preset.searchString is in English)
       const { included, excluded } = parseSearchStringToFilters(preset.searchString);
       
-      // Set the search string and filters
-      setSearchString(preset.searchString);
+      // Set the search string and filters (translate if needed)
+      setTranslatedSearchString(preset.searchString);
       setIncludedFilters(included);
       setExcludedFilters(excluded);
       setIsPremadeSearch(true);
@@ -1417,20 +1507,35 @@ const PokemonGoSearchBuilder = () => {
                 Build search strings visually
               </p>
             </div>
-            <button
-              onClick={() => setIsDarkMode(prev => !prev)}
-              aria-pressed={isDarkMode}
-              className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors self-start"
-            >
-              {isDarkMode ? (
-                <Sun className="w-4 h-4" />
-              ) : (
-                <Moon className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">
-                {isDarkMode ? 'Light mode' : 'Dark mode'}
-              </span>
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Language Selector */}
+              <div className="relative">
+                <select
+                  value={selectedLanguage}
+                  onChange={(e) => setSelectedLanguage(e.target.value)}
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900 cursor-pointer appearance-none pr-8"
+                >
+                  {getAvailableLanguages().map(lang => (
+                    <option key={lang} value={lang}>{lang}</option>
+                  ))}
+                </select>
+                <Globe className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-[#0077BE] dark:text-slate-100" />
+              </div>
+              <button
+                onClick={() => setIsDarkMode(prev => !prev)}
+                aria-pressed={isDarkMode}
+                className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors self-start"
+              >
+                {isDarkMode ? (
+                  <Sun className="w-4 h-4" />
+                ) : (
+                  <Moon className="w-4 h-4" />
+                )}
+                <span className="hidden sm:inline">
+                  {isDarkMode ? 'Light mode' : 'Dark mode'}
+                </span>
+              </button>
+            </div>
           </div>
 
           {/* Output Section - FOCAL POINT */}
@@ -1459,6 +1564,21 @@ const PokemonGoSearchBuilder = () => {
                         </p>
                       </div>
                     )}
+                  </div>
+                )}
+                {translationWarnings.length > 0 && (
+                  <div className="relative group">
+                    <AlertTriangle className="w-4 h-4 text-yellow-500 cursor-help" />
+                    <div className="absolute left-0 top-full mt-2 z-50 w-80 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/80 border-2 border-yellow-400 dark:border-yellow-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
+                      <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
+                        Translation Warnings:
+                      </p>
+                      <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
+                        {translationWarnings.map((warning, idx) => (
+                          <li key={idx}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
                   </div>
                 )}
               </div>
