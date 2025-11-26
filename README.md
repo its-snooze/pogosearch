@@ -1,70 +1,209 @@
-# Getting Started with Create React App
+# Pokemon GO Search String Builder
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+> An open-source tool to build Pokemon GO search strings without memorizing syntax
 
-## Available Scripts
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K0ZNM6K)
 
-In the project directory, you can run:
+## 🎮 Live Demo
 
-### `npm start`
+**[Launch Tool →](https://its-snooze.github.io/pogosearch)**
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## ✨ Features
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- **200+ Filters** across 7 categories
 
-### `npm test`
+- **Include/Exclude System** - Add (+) or exclude (-) any filter
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- **Complete Coverage**:
 
-### `npm run build`
+  - All IV star ratings and specific stat filters
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+  - All 18 Pokemon types
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+  - Year filters (2016-2021) for lucky trade searching
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+  - Regional forms (Alolan, Galarian, Hisuian, Paldean)
 
-### `npm run eject`
+  - Complete move slot filters (@1/@2/@3 for all types)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+  - Evolution filters (evolvenew, item, tradeevolve)
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+  - Background filters (location, special, event backgrounds)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+  - Buddy levels, sizes, gender filters
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+- **Active Filter Chips** - Visual display of selected filters with quick removal
 
-## Learn More
+- **Saved Searches** - Bookmark frequently used searches
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- **Dark Mode** - Easy on the eyes
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+- **Mobile Friendly** - Works seamlessly on all devices
 
-### Code Splitting
+- **Copy to Clipboard** - One-click copy for easy pasting into Pokemon GO
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+## 🚀 Why Use This Tool?
 
-### Analyzing the Bundle Size
+Pokemon GO's search syntax is powerful but hard to remember. Instead of typing `4*&shiny&!shadow&year2016-2020`, just click the filters you want and copy the generated string.
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Perfect for:
 
-### Making a Progressive Web App
+- Finding Pokemon for lucky trades
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- IV hunting and appraisal filtering
 
-### Advanced Configuration
+- Move-based searches for raids/PvP
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- Storage management and organization
 
-### Deployment
+- Event Pokemon with special backgrounds
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## 📱 How to Use
 
-### `npm run build` fails to minify
+1. Visit [https://its-snooze.github.io/pogosearch](https://its-snooze.github.io/pogosearch)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+2. Click through categories to find filters
+
+3. Use **+** to include or **-** to exclude filters
+
+4. Copy the generated search string
+
+5. Paste into Pokemon GO's search bar
+
+## 🛠️ Development
+
+### Prerequisites
+
+- Node.js (v14 or higher)
+
+- npm or yarn
+
+### Local Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/its-snooze/pogosearch.git
+
+# Navigate to directory
+cd pogosearch
+
+# Install dependencies
+npm install
+
+# Run locally
+npm start
+
+# Build for production
+npm run build
+
+# Deploy to GitHub Pages
+npm run deploy
+```
+
+## 🎯 Filter Categories
+
+1. **Stats & IVs** - Star ratings, attack/defense/HP filters
+
+2. **Types** - All 18 Pokemon types
+
+3. **Special Status** - Shiny, lucky, shadow, purified, legendary, mythical, regional forms
+
+4. **Evolution & Buddy** - Evolution status, mega evolution, buddy levels
+
+5. **Time & Distance** - Age filters, year filters, distance from location
+
+6. **Size & Gender** - XXS, XXL, male, female filters
+
+7. **Moves** - Move types with slot-specific filtering
+
+8. **Regions** - Kanto through Paldea
+
+## 🤝 Contributing
+
+Contributions are welcome! This is an open-source community project.
+
+### How to Contribute
+
+1. Fork the repository
+
+2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
+
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+
+5. Open a Pull Request
+
+### Ideas for Contributions
+
+- Add missing filters
+
+- Improve UI/UX
+
+- Fix bugs
+
+- Add premade search templates
+
+- Improve mobile experience
+
+- Add tests
+
+## 📝 Roadmap
+
+Potential future features:
+
+- [ ] Premade search templates (PvP IVs, Quick Transfer, Lucky Candidates)
+
+- [ ] CP/HP range inputs
+
+- [ ] Distance filter input
+
+- [ ] Pokedex number search
+
+- [ ] Search history
+
+- [ ] Export/Import saved searches
+
+- [ ] Tooltips explaining each filter
+
+Have an idea? [Open an issue](https://github.com/its-snooze/pogosearch/issues)!
+
+## 🐛 Bug Reports
+
+Found a bug? Please [open an issue](https://github.com/its-snooze/pogosearch/issues) with:
+
+- Description of the bug
+
+- Steps to reproduce
+
+- Expected vs actual behavior
+
+- Screenshots (if applicable)
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 💖 Support
+
+If you find this tool useful, consider supporting its development:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K0ZNM6K)
+
+## 🙏 Acknowledgments
+
+- Built for the Pokemon GO community
+
+- Filter syntax based on [official Niantic documentation](https://niantic.helpshift.com/hc/en/21-pokemon-go/faq/2097-search-bar/)
+
+- Inspired by the need for easier Pokemon management
+
+## 📧 Contact
+
+- GitHub: [@its-snooze](https://github.com/its-snooze)
+
+- Issues: [GitHub Issues](https://github.com/its-snooze/pogosearch/issues)
+
+---
+
+**Made with ❤️ for Pokemon GO trainers worldwide** 🎮
