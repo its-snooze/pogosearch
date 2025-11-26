@@ -194,7 +194,7 @@ If you find this tool useful, consider supporting its development:
 
 - Built for the Pokemon GO community
 
-- Filter syntax based on [official Niantic documentation](https://niantic.helpshift.com/hc/en/21-pokemon-go/faq/2097-search-bar/)
+- Filter syntax based on official Niantic documentation
 
 - Inspired by the need for easier Pokemon management
 

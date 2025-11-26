@@ -214,9 +214,9 @@ const filterCategories = {
       { id: 'age0', label: 'Caught Today', value: 'age0' },
       { id: 'age0-7', label: 'Last 7 Days', value: 'age0-7' },
       { id: 'age0-30', label: 'Last 30 Days', value: 'age0-30' },
-      { id: 'year2024', label: 'Year 2024', value: 'year2024' },
-      { id: 'year2023', label: 'Year 2023', value: 'year2023' },
-      { id: 'year2022', label: 'Year 2022', value: 'year2022' },
+      { id: 'year2024', label: '2024', value: 'year2024' },
+      { id: 'year2023', label: '2023', value: 'year2023' },
+      { id: 'year2022', label: '2022', value: 'year2022' },
       { id: 'year2021', label: '2021', value: 'year2021' },
       { id: 'year2020', label: '2020', value: 'year2020' },
       { id: 'year2019', label: '2019', value: 'year2019' },
@@ -1227,7 +1227,7 @@ const PokemonGoSearchBuilder = () => {
     sTierNonShadow: {
       label: 'S-Tier Non-Shadow',
       description: 'Mega/Primal Pokemon - top priorities',
-      searchString: '889,888,646,382,383,384,448,94,719,6,257,890,800&mega,primal',
+      searchString: '889,888,646,382,383,384,448,94,719,6,257,890,800',
       tier: 'S',
       type: 'Non-Shadow'
     },
