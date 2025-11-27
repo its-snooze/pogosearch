@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { translateSearchString, translateTerm, translateToEnglish, getAvailableLanguages, getLocale } from './utils/translation';
 import { getUIText } from './translations/uiTranslations';
+import CustomAgeInput from './components/CustomAgeInput';
 
 // Validation function for Pokemon GO search strings
 function validateSearchString(str) {
@@ -372,6 +373,9 @@ const PokemonGoSearchBuilder = () => {
     if (typeof window === 'undefined') return false;
     return localStorage.getItem('pogoDiscordDismissed') === 'true';
   });
+  const [customAgeValue, setCustomAgeValue] = useState('');
+  const [customAgeIncluded, setCustomAgeIncluded] = useState(false);
+  const [customAgeExcluded, setCustomAgeExcluded] = useState(false);
   const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
@@ -696,8 +700,12 @@ const PokemonGoSearchBuilder = () => {
     }
 
     // Time: Combine with commas (OR logic) if multiple, with smart year range detection
-    if (includedTime.length > 0) {
+    if (includedTime.length > 0 || customAgeIncluded) {
       const timeValues = combineYearRanges(includedTime);
+      // Add custom age if included
+      if (customAgeIncluded && customAgeValue) {
+        timeValues.push(customAgeValue);
+      }
       if (timeValues.length > 0) {
         parts.push(timeValues.join(','));
       }
@@ -783,11 +791,15 @@ const PokemonGoSearchBuilder = () => {
       }
     }
 
-    if (excludedTime.length > 0) {
-      const timeValues = combineYearRanges(excludedTime)
-        .map(v => `!${v}`);
-      if (timeValues.length > 0) {
-        excludedParts.push(timeValues.join(','));
+    if (excludedTime.length > 0 || customAgeExcluded) {
+      const timeValues = combineYearRanges(excludedTime);
+      // Add custom age if excluded
+      if (customAgeExcluded && customAgeValue) {
+        timeValues.push(customAgeValue);
+      }
+      const excludedTimeValues = timeValues.map(v => `!${v}`);
+      if (excludedTimeValues.length > 0) {
+        excludedParts.push(excludedTimeValues.join(','));
       }
     }
 
@@ -858,7 +870,7 @@ const PokemonGoSearchBuilder = () => {
     }
     
     return result;
-  }, [selectedLanguage]);
+  }, [selectedLanguage, customAgeIncluded, customAgeExcluded, customAgeValue]);
 
   // Save language preference to localStorage
   React.useEffect(() => {
@@ -970,6 +982,36 @@ const PokemonGoSearchBuilder = () => {
     });
   };
 
+  // Custom age handlers
+  const handleCustomAgeInclude = () => {
+    setIsPremadeSearch(false);
+    if (customAgeIncluded) {
+      setCustomAgeIncluded(false);
+    } else {
+      setCustomAgeExcluded(false);
+      setCustomAgeIncluded(true);
+    }
+  };
+
+  const handleCustomAgeExclude = () => {
+    setIsPremadeSearch(false);
+    if (customAgeExcluded) {
+      setCustomAgeExcluded(false);
+    } else {
+      setCustomAgeIncluded(false);
+      setCustomAgeExcluded(true);
+    }
+  };
+
+  const handleCustomAgeValueChange = (value) => {
+    setCustomAgeValue(value);
+    // Clear include/exclude if value is cleared
+    if (!value || value.trim() === '') {
+      setCustomAgeIncluded(false);
+      setCustomAgeExcluded(false);
+    }
+  };
+
   const removeFilter = (filterId, isExcluded = false) => {
     setIsPremadeSearch(false);
     setRemovingChip(filterId);
@@ -989,6 +1031,9 @@ const PokemonGoSearchBuilder = () => {
     setSearchString('');
     setTranslationWarnings([]);
     setIsPremadeSearch(false);
+    setCustomAgeValue('');
+    setCustomAgeIncluded(false);
+    setCustomAgeExcluded(false);
     pokedexNumbersRef.current = ''; // Clear Pokedex numbers ref
   };
 
@@ -1101,6 +1146,32 @@ const PokemonGoSearchBuilder = () => {
   }, [filterSearch]);
 
   const getChipLabel = (filterId) => {
+    // Handle custom age
+    if (filterId === 'customAge') {
+      const formatAgeForDisplay = (ageValue) => {
+        if (!ageValue) return 'Custom Age';
+        if (ageValue.startsWith('age')) {
+          const agePart = ageValue.substring(3);
+          // Format for display
+          if (agePart === '0') return 'Today';
+          if (agePart.match(/^0-(\d+)$/)) {
+            const days = agePart.match(/^0-(\d+)$/)[1];
+            return `Last ${days} days`;
+          }
+          if (agePart.match(/^(\d+)-$/)) {
+            const days = agePart.match(/^(\d+)-$/)[1];
+            return `More than ${days} days ago`;
+          }
+          if (agePart.match(/^(\d+)-(\d+)$/)) {
+            const match = agePart.match(/^(\d+)-(\d+)$/);
+            return `${match[1]}-${match[2]} days ago`;
+          }
+          return `Age ${agePart}`;
+        }
+        return ageValue;
+      };
+      return formatAgeForDisplay(customAgeValue);
+    }
     const filter = Object.values(filterCategories)
       .flatMap(cat => cat.filters)
       .find(f => f.id === filterId);
@@ -1793,7 +1864,7 @@ const PokemonGoSearchBuilder = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* Active Filter Chips - Compact Display */}
-        {(includedFilters.length > 0 || excludedFilters.length > 0) && (
+        {(includedFilters.length > 0 || excludedFilters.length > 0 || customAgeIncluded || customAgeExcluded) && (
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-slate-800">
             <div className="flex flex-wrap gap-2">
               {includedFilters.map(filterId => {
@@ -1817,6 +1888,31 @@ const PokemonGoSearchBuilder = () => {
                   </div>
                 );
               })}
+              {customAgeIncluded && customAgeValue && (
+                <div
+                  key="included-customAge"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#0077BE] to-[#00A7E5] text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
+                    removingChip === 'customAge' ? 'chip-fade-out' : 'chip-fade-in'
+                  }`}
+                >
+                  <Plus className="w-3 h-3" />
+                  <span className="whitespace-nowrap">{getChipLabel('customAge')}</span>
+                  <button
+                    onClick={() => {
+                      setRemovingChip('customAge');
+                      setTimeout(() => {
+                        setCustomAgeIncluded(false);
+                        setCustomAgeValue('');
+                        setRemovingChip(null);
+                      }, 300);
+                    }}
+                    className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
+                    aria-label="Remove filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
               {excludedFilters.map(filterId => {
                 const isRemoving = removingChip === filterId;
                 return (
@@ -1838,6 +1934,31 @@ const PokemonGoSearchBuilder = () => {
                   </div>
                 );
               })}
+              {customAgeExcluded && customAgeValue && (
+                <div
+                  key="excluded-customAge"
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
+                    removingChip === 'customAge' ? 'chip-fade-out' : 'chip-fade-in'
+                  }`}
+                >
+                  <Minus className="w-3 h-3" />
+                  <span className="whitespace-nowrap">{getChipLabel('customAge')}</span>
+                  <button
+                    onClick={() => {
+                      setRemovingChip('customAge');
+                      setTimeout(() => {
+                        setCustomAgeExcluded(false);
+                        setCustomAgeValue('');
+                        setRemovingChip(null);
+                      }, 300);
+                    }}
+                    className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
+                    aria-label="Remove filter"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -2357,7 +2478,7 @@ const PokemonGoSearchBuilder = () => {
             const isExpanded = expandedCategories[key];
             const activeCount = category.filters.filter(f => 
               includedFilters.includes(f.id) || excludedFilters.includes(f.id)
-            ).length;
+            ).length + (key === 'time' && (customAgeIncluded || customAgeExcluded) ? 1 : 0);
             
             return (
               <div key={key} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow duration-200 dark:bg-slate-900/70 dark:border-slate-800 dark:hover:shadow-slate-900/40">
@@ -2449,6 +2570,17 @@ const PokemonGoSearchBuilder = () => {
                           </Tooltip>
                         );
                       })}
+                      {/* Custom Age Input - only show in time category */}
+                      {key === 'time' && (
+                        <CustomAgeInput
+                          value={customAgeValue}
+                          isIncluded={customAgeIncluded}
+                          isExcluded={customAgeExcluded}
+                          onInclude={handleCustomAgeInclude}
+                          onExclude={handleCustomAgeExclude}
+                          onValueChange={handleCustomAgeValueChange}
+                        />
+                      )}
                     </div>
                   </div>
                 )}
