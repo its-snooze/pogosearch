@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Plus, Minus, Calendar } from 'lucide-react';
+import { getUIText } from '../translations/uiTranslations';
 
-const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, onValueChange }) => {
+const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, onValueChange, selectedLanguage = 'English' }) => {
   const [inputValue, setInputValue] = useState(value || '');
   const [error, setError] = useState('');
 
@@ -158,7 +159,7 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
       onValueChange(parsed);
       setError('');
     } else {
-      setError('Invalid format. Use: number (e.g., 30), range (e.g., 0-7), or age format (e.g., age0-30)');
+      setError(getUIText('invalid_format', selectedLanguage));
     }
   };
 
@@ -169,9 +170,9 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
   };
 
   const presets = [
-    { label: 'Last Week', value: 'age0-7' },
-    { label: 'Last Month', value: 'age0-30' },
-    { label: 'Last Year', value: 'age0-365' },
+    { label: getUIText('last_week', selectedLanguage), value: 'age0-7' },
+    { label: getUIText('last_month', selectedLanguage), value: 'age0-30' },
+    { label: getUIText('last_year', selectedLanguage), value: 'age0-365' },
   ];
 
   const dateRangeDesc = value ? getDateRangeDescription(value) : '';
@@ -182,7 +183,7 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
         <div className="flex items-center gap-2 mb-3">
           <Calendar className="w-5 h-5 text-blue-600 dark:text-blue-400" />
           <h3 className="text-sm font-bold text-blue-900 dark:text-blue-100">
-            Custom Date Range
+            {getUIText('custom_date_range', selectedLanguage)}
           </h3>
         </div>
 
@@ -208,7 +209,7 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
                 value={inputValue}
                 onChange={handleInputChange}
                 onBlur={handleBlur}
-                placeholder="e.g., 30 (last 30 days) or 0-7 (last week) or age0-30"
+                placeholder={`e.g., 30 (${getUIText('last_30_days', selectedLanguage).toLowerCase()}) or 0-7 (${getUIText('last_week', selectedLanguage).toLowerCase()}) or age0-30`}
                 className={`w-full px-3 py-2 text-sm rounded-lg border-2 transition-colors ${
                   error
                     ? 'border-red-400 dark:border-red-600'
@@ -243,7 +244,7 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
                   ? 'filter-button-plus-disabled'
                   : 'filter-button-plus-default'
               }`}
-              title="Include"
+              title={getUIText('include', selectedLanguage)}
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -256,7 +257,7 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
                   ? 'filter-button-minus-disabled'
                   : 'filter-button-minus-default'
               }`}
-              title="Exclude"
+              title={getUIText('exclude', selectedLanguage)}
             >
               <Minus className="w-4 h-4" />
             </button>
@@ -265,11 +266,11 @@ const CustomAgeInput = ({ value, isIncluded, isExcluded, onInclude, onExclude, o
 
         {/* Help Text */}
         <div className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-          <p>Examples:</p>
+          <p>{getUIText('examples', selectedLanguage)}:</p>
           <ul className="list-disc list-inside ml-2 space-y-0.5">
-            <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">30</code> = Last 30 days</li>
-            <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">0-7</code> = Last week</li>
-            <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">30-</code> = More than 30 days ago</li>
+            <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">30</code> = {getUIText('last_30_days', selectedLanguage)}</li>
+            <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">0-7</code> = {getUIText('last_week', selectedLanguage)}</li>
+            <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">30-</code> = {getUIText('more_than_days_ago', selectedLanguage).replace('{days}', '30')}</li>
             <li><code className="bg-white/50 dark:bg-slate-800/50 px-1 rounded">age0-30</code> = Direct format</li>
           </ul>
         </div>

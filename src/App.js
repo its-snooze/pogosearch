@@ -1145,28 +1145,186 @@ const PokemonGoSearchBuilder = () => {
     return result;
   }, [filterSearch]);
 
+  // Helper function to translate filter labels
+  const translateFilterLabel = (filter, language) => {
+    if (!filter || !filter.label) return '';
+    
+    const filterId = filter.id;
+    const originalLabel = filter.label;
+    
+    // Handle time-related filters (UI-only terms)
+    if (filterId === 'age0') {
+      return getUIText('caught_today', language);
+    }
+    if (filterId === 'age0-7') {
+      return getUIText('last_7_days', language);
+    }
+    if (filterId === 'age0-30') {
+      return getUIText('last_30_days', language);
+    }
+    if (filterId.startsWith('year')) {
+      // Year numbers stay as numbers
+      return filterId.replace('year', '');
+    }
+    if (filterId === 'distance1000-') {
+      return getUIText('distance_1000km_plus', language);
+    }
+    if (filterId === 'distance100-') {
+      return getUIText('distance_100km_plus', language);
+    }
+    
+    // Handle move filters (with @ prefix)
+    if (filterId.startsWith('@')) {
+      // Extract type from move filter (e.g., @1fire -> fire)
+      const moveMatch = filterId.match(/@[123](normal|fire|water|electric|grass|ice|fighting|poison|ground|flying|psychic|bug|rock|ghost|dragon|dark|steel|fairy|special|weather)/);
+      if (moveMatch) {
+        const type = moveMatch[1];
+        if (type === 'special') {
+          // Try to translate "Legacy/Special Moves"
+          const translated = translateTerm('special', language, 'move');
+          return translated !== 'special' ? translated + ' / ' + translateTerm('Legacy', language, 'move') : originalLabel;
+        }
+        if (type === 'weather') {
+          const translated = translateTerm('weather', language, 'move');
+          return translated !== 'weather' ? translated : originalLabel;
+        }
+        // Translate the type name
+        const translatedType = translateTerm(type, language, 'name');
+        if (translatedType === type) {
+          // If translation not found, return original
+          return originalLabel;
+        }
+        // Replace the type in the original label
+        // Original labels are like "Fire Fast Move", "Normal Charged Move 1", etc.
+        const typeMatch = originalLabel.match(/^(\w+)\s+(.+)$/);
+        if (typeMatch) {
+          return `${translatedType} ${typeMatch[2]}`;
+        }
+        return translatedType;
+      }
+      return originalLabel;
+    }
+    
+    // Handle type filters (game terms)
+    const typeNames = ['normal', 'fire', 'water', 'electric', 'grass', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
+    if (typeNames.includes(filterId)) {
+      return translateTerm(filterId, language, 'name');
+    }
+    
+    // Handle special status filters (game terms)
+    const specialStatus = ['shiny', 'lucky', 'shadow', 'purified', 'legendary', 'mythical', 'ultrabeast', 'dynamax', 'gigantamax', 'costume', 'background', 'locationbackground', 'specialbackground', 'hatched', 'eggsonly', 'traded', 'alolan', 'galarian', 'hisuian', 'paldean', 'defender', 'favorite'];
+    if (specialStatus.includes(filterId)) {
+      return translateTerm(filterId, language, 'name');
+    }
+    
+    // Handle region filters (game terms)
+    const regions = ['kanto', 'johto', 'hoenn', 'sinnoh', 'unova', 'kalos', 'alola', 'galar', 'paldea'];
+    if (regions.includes(filterId)) {
+      const translated = translateTerm(filterId, language, 'name');
+      // Keep the Gen number part
+      const genMatch = originalLabel.match(/\(Gen \d+\)/);
+      if (genMatch) {
+        return `${translated} ${genMatch[0]}`;
+      }
+      return translated;
+    }
+    
+    // Handle gender filters
+    if (filterId === 'male' || filterId === 'female') {
+      return translateTerm(filterId, language, 'name');
+    }
+    if (filterId === 'genderunknown') {
+      return translateTerm('genderless', language, 'name');
+    }
+    
+    // Handle size filters - these are usually abbreviations, but check if they exist in translations
+    if (filterId === 'xxs' || filterId === 'xs' || filterId === 'xl' || filterId === 'xxl') {
+      // These are usually kept as abbreviations, but try to translate if available
+      const translated = translateTerm(filterId.toUpperCase(), language, 'name');
+      return translated !== filterId.toUpperCase() ? translated : originalLabel;
+    }
+    
+    // Handle evolution/buddy filters
+    const evolutionTerms = ['evolve', 'megaevolve', 'evolvenew', 'item', 'tradeevolve', 'mega0', 'mega1', 'mega2', 'mega3', 'buddy0', 'buddy1', 'buddy2', 'buddy3', 'buddy4', 'buddy5'];
+    if (evolutionTerms.includes(filterId)) {
+      // Try to translate the full term first
+      let translated = translateTerm(filterId, language, 'name');
+      if (translated !== filterId) {
+        return translated;
+      }
+      // If that doesn't work, try the base term
+      const baseTerm = filterId.replace(/\d+$/, '');
+      translated = translateTerm(baseTerm, language, 'name');
+      if (translated !== baseTerm) {
+        // If we have a number suffix, try to preserve the label structure
+        const numMatch = filterId.match(/(\d+)$/);
+        if (numMatch && originalLabel.includes(numMatch[0])) {
+          // Try to reconstruct: translate base + keep number part
+          const labelParts = originalLabel.split(' ');
+          const translatedParts = labelParts.map(part => {
+            if (part.toLowerCase().includes(baseTerm)) {
+              return part.replace(new RegExp(baseTerm, 'gi'), translated);
+            }
+            return part;
+          });
+          return translatedParts.join(' ');
+        }
+        return translated;
+      }
+    }
+    
+    // Handle stats filters - try to translate the whole term first, then fall back to parts
+    if (filterId.includes('attack') || filterId.includes('defense') || filterId.includes('hp')) {
+      // Try translating the full term first (e.g., "4attack" -> "Perfect Attack")
+      const translated = translateTerm(filterId, language, 'search');
+      if (translated !== filterId) {
+        // If we got a translation, use it
+        return translated;
+      }
+      // Otherwise, try to translate parts of the label
+      const parts = originalLabel.split(' ');
+      const translatedParts = parts.map(part => {
+        // Remove parentheses and numbers for translation
+        const cleanPart = part.replace(/[()0-9-]/g, '').trim();
+        if (cleanPart === 'Perfect' || cleanPart === 'High' || cleanPart === 'Zero') {
+          const translated = translateTerm(cleanPart, language, 'name');
+          return translated !== cleanPart ? translated : part;
+        }
+        if (cleanPart === 'Attack' || cleanPart === 'Defense' || cleanPart === 'HP') {
+          const translated = translateTerm(cleanPart.toLowerCase(), language, 'name');
+          return translated !== cleanPart.toLowerCase() ? translated : part;
+        }
+        return part;
+      });
+      return translatedParts.join(' ');
+    }
+    
+    // Default: return original label if no translation found
+    return originalLabel;
+  };
+
   const getChipLabel = (filterId) => {
     // Handle custom age
     if (filterId === 'customAge') {
       const formatAgeForDisplay = (ageValue) => {
-        if (!ageValue) return 'Custom Age';
+        if (!ageValue) return getUIText('custom_age', selectedLanguage);
         if (ageValue.startsWith('age')) {
           const agePart = ageValue.substring(3);
           // Format for display
-          if (agePart === '0') return 'Today';
+          if (agePart === '0') return getUIText('today', selectedLanguage);
           if (agePart.match(/^0-(\d+)$/)) {
             const days = agePart.match(/^0-(\d+)$/)[1];
-            return `Last ${days} days`;
+            return getUIText('last_days', selectedLanguage).replace('{days}', days);
           }
           if (agePart.match(/^(\d+)-$/)) {
             const days = agePart.match(/^(\d+)-$/)[1];
-            return `More than ${days} days ago`;
+            return getUIText('more_than_days_ago', selectedLanguage).replace('{days}', days);
           }
           if (agePart.match(/^(\d+)-(\d+)$/)) {
             const match = agePart.match(/^(\d+)-(\d+)$/);
-            return `${match[1]}-${match[2]} days ago`;
+            return getUIText('days_ago', selectedLanguage).replace('{start}', match[1]).replace('{end}', match[2]);
           }
-          return `Age ${agePart}`;
+          return getUIText('age_label', selectedLanguage).replace('{value}', agePart);
         }
         return ageValue;
       };
@@ -1175,7 +1333,10 @@ const PokemonGoSearchBuilder = () => {
     const filter = Object.values(filterCategories)
       .flatMap(cat => cat.filters)
       .find(f => f.id === filterId);
-    return filter?.label || filterId;
+    if (filter) {
+      return translateFilterLabel(filter, selectedLanguage);
+    }
+    return filterId;
   };
 
   const clearSearch = () => {
@@ -1440,31 +1601,31 @@ const PokemonGoSearchBuilder = () => {
     event.target.value = '';
   };
 
-  // Pokemon Generation and Group data
-  const pokemonGenerations = [
-    { label: 'Gen 1 (Kanto)', range: '1-151' },
-    { label: 'Gen 2 (Johto)', range: '152-251' },
-    { label: 'Gen 3 (Hoenn)', range: '252-386' },
-    { label: 'Gen 4 (Sinnoh)', range: '387-493' },
-    { label: 'Gen 5 (Unova)', range: '494-649' },
-    { label: 'Gen 6 (Kalos)', range: '650-721' },
-    { label: 'Gen 7 (Alola)', range: '722-809' },
-    { label: 'Gen 8 (Galar)', range: '810-905' },
-  ];
+  // Pokemon Generation and Group data - translated based on selected language
+  const pokemonGenerations = useMemo(() => [
+    { label: getUIText('gen_1_kanto', selectedLanguage), range: '1-151' },
+    { label: getUIText('gen_2_johto', selectedLanguage), range: '152-251' },
+    { label: getUIText('gen_3_hoenn', selectedLanguage), range: '252-386' },
+    { label: getUIText('gen_4_sinnoh', selectedLanguage), range: '387-493' },
+    { label: getUIText('gen_5_unova', selectedLanguage), range: '494-649' },
+    { label: getUIText('gen_6_kalos', selectedLanguage), range: '650-721' },
+    { label: getUIText('gen_7_alola', selectedLanguage), range: '722-809' },
+    { label: getUIText('gen_8_galar', selectedLanguage), range: '810-905' },
+  ], [selectedLanguage]);
 
-  const pokemonGroups = [
-    { label: 'All Starters', numbers: '1,2,3,4,5,6,7,8,9,152,153,154,155,156,157,158,159,160,252,253,254,255,256,257,258,259,260,387,388,389,390,391,392,393,394,395,495,496,497,498,499,500,501,502,503,650,651,652,653,654,655,656,657,658,722,723,724,725,726,727,728,729,730,810,811,812,813,814,815,816,817,818' },
-    { label: 'Kanto Starters', numbers: '1,2,3,4,5,6,7,8,9' },
-    { label: 'Johto Starters', numbers: '152,153,154,155,156,157,158,159,160' },
-    { label: 'Hoenn Starters', numbers: '252,253,254,255,256,257,258,259,260' },
-    { label: 'Sinnoh Starters', numbers: '387,388,389,390,391,392,393,394,395' },
-    { label: 'Unova Starters', numbers: '495,496,497,498,499,500,501,502,503' },
-    { label: 'Kalos Starters', numbers: '650,651,652,653,654,655,656,657,658' },
-    { label: 'Alola Starters', numbers: '722,723,724,725,726,727,728,729,730' },
-    { label: 'Galar Starters', numbers: '810,811,812,813,814,815,816,817,818' },
-    { label: 'Pseudo-Legendaries', numbers: '147,148,149,246,247,248,371,372,373,443,444,445,610,611,612,633,634,635,704,705,706,782,783,784,885,886,887' },
-    { label: 'Eeveelutions', numbers: '133,134,135,136,196,197,470,471,700' },
-  ];
+  const pokemonGroups = useMemo(() => [
+    { label: getUIText('all_starters', selectedLanguage), numbers: '1,2,3,4,5,6,7,8,9,152,153,154,155,156,157,158,159,160,252,253,254,255,256,257,258,259,260,387,388,389,390,391,392,393,394,395,495,496,497,498,499,500,501,502,503,650,651,652,653,654,655,656,657,658,722,723,724,725,726,727,728,729,730,810,811,812,813,814,815,816,817,818' },
+    { label: getUIText('kanto_starters', selectedLanguage), numbers: '1,2,3,4,5,6,7,8,9' },
+    { label: getUIText('johto_starters', selectedLanguage), numbers: '152,153,154,155,156,157,158,159,160' },
+    { label: getUIText('hoenn_starters', selectedLanguage), numbers: '252,253,254,255,256,257,258,259,260' },
+    { label: getUIText('sinnoh_starters', selectedLanguage), numbers: '387,388,389,390,391,392,393,394,395' },
+    { label: getUIText('unova_starters', selectedLanguage), numbers: '495,496,497,498,499,500,501,502,503' },
+    { label: getUIText('kalos_starters', selectedLanguage), numbers: '650,651,652,653,654,655,656,657,658' },
+    { label: getUIText('alola_starters', selectedLanguage), numbers: '722,723,724,725,726,727,728,729,730' },
+    { label: getUIText('galar_starters', selectedLanguage), numbers: '810,811,812,813,814,815,816,817,818' },
+    { label: getUIText('pseudo_legendaries', selectedLanguage), numbers: '147,148,149,246,247,248,371,372,373,443,444,445,610,611,612,633,634,635,704,705,706,782,783,784,885,886,887' },
+    { label: getUIText('eeveelutions', selectedLanguage), numbers: '133,134,135,136,196,197,470,471,700' },
+  ], [selectedLanguage]);
 
   // Premade search presets
   const premadeSearches = {
@@ -2214,92 +2375,92 @@ const PokemonGoSearchBuilder = () => {
               {/* Common Combos Subsection */}
               <div>
                 <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">Common Combos</h3>
-                <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">Quick Combos</h4>
+                <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">{getUIText('quick_combos', selectedLanguage)}</h4>
                 <div className="mb-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg dark:bg-slate-900/60 dark:border-purple-500/30">
-                  <p className="text-xs text-purple-800 font-semibold mb-1 dark:text-purple-200">ℹ️ Quick Combos</p>
+                  <p className="text-xs text-purple-800 font-semibold mb-1 dark:text-purple-200">ℹ️ {getUIText('quick_combos', selectedLanguage)}</p>
                   <p className="text-xs text-purple-700 leading-relaxed dark:text-purple-100">
-                    These buttons append filter combinations to your existing search string, allowing you to stack multiple combos together.
+                    {getUIText('quick_combos_info', selectedLanguage)}
                   </p>
                 </div>
                 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
-                  <Tooltip text="All shiny legendary Pokemon">
+                  <Tooltip text={getUIText('shiny_legendaries_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&shiny&legendary')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-white mb-1">Shiny Legendaries</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-100">All shiny legendary Pokemon</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-white mb-1">{getUIText('shiny_legendaries', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-100">{getUIText('shiny_legendaries_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="100% IV shadow Pokemon">
+                  <Tooltip text={getUIText('perfect_shadows_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&4*&shadow')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Perfect Shadows</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">100% IV shadow Pokemon</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('perfect_shadows', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('perfect_shadows_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="3-4★ Pokemon that aren't shiny">
+                  <Tooltip text={getUIText('high_iv_non_shiny_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&3*,4*&!shiny')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">High IV Non-Shiny</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">3-4★ Pokemon that aren't shiny</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('high_iv_non_shiny', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('high_iv_non_shiny_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="Low IV non-favorites for trading">
+                  <Tooltip text={getUIText('trade_fodder_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&!favorite&!shiny&0*,1*')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Trade Fodder</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Low IV non-favorites for trading</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('trade_fodder', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('trade_fodder_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="Pokemon caught in the last week">
+                  <Tooltip text={getUIText('recent_catches_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&age0-7')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Recent Catches</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Pokemon caught in the last week</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('recent_catches', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('recent_catches_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="Can evolve, not favorited">
+                  <Tooltip text={getUIText('evolution_ready_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&evolve&!favorite')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Evolution Ready</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Can evolve, not favorited</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('evolution_ready', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('evolution_ready_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="Shiny Pokemon with costumes">
+                  <Tooltip text={getUIText('shiny_costume_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&shiny&costume')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Shiny Costume</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Shiny Pokemon with costumes</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('shiny_costume', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('shiny_costume_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
 
-                  <Tooltip text="Legendaries you haven't found shiny">
+                  <Tooltip text={getUIText('legendary_non_shiny_desc', selectedLanguage)}>
                     <button
                       onClick={() => appendFilterCombo('&legendary&!shiny')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
-                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">Legendary Non-Shiny</div>
-                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">Legendaries you haven't found shiny</div>
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('legendary_non_shiny', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('legendary_non_shiny_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
                 </div>
@@ -2323,15 +2484,15 @@ const PokemonGoSearchBuilder = () => {
                 />
               </button>
             </div>
-            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">Insert CP ranges for PvP leagues</p>
+            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">{getUIText('insert_cp_range', selectedLanguage)}</p>
           </div>
 
           {showCPRanges && (
             <div className="saved-searches-expand">
               <div className="mb-3 p-3 bg-violet-50/80 border border-violet-200 rounded-lg dark:bg-slate-900/60 dark:border-violet-500/30">
-                <p className="text-xs text-violet-800 font-semibold mb-1 dark:text-violet-200">ℹ️ PvP League CP Caps</p>
+                <p className="text-xs text-violet-800 font-semibold mb-1 dark:text-violet-200">ℹ️ {getUIText('pvp_league_cp_caps', selectedLanguage)}</p>
                 <p className="text-xs text-violet-700 leading-relaxed dark:text-violet-100">
-                  These are the competitive PvP league CP caps used in Pokemon GO. Clicking a button will insert or replace the CP range in your search string.
+                  {getUIText('pvp_league_cp_caps_desc', selectedLanguage)}
                 </p>
               </div>
               
@@ -2340,48 +2501,48 @@ const PokemonGoSearchBuilder = () => {
                   onClick={() => insertCPRange('cp0-1500')}
                   className="group relative p-3 sm:p-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                 >
-                  <div className="font-bold text-sm sm:text-base text-violet-800 mb-1">Great League</div>
-                  <div className="text-[10px] sm:text-xs text-violet-600 font-mono">CP 0-1500</div>
+                  <div className="font-bold text-sm sm:text-base text-violet-800 mb-1">{getUIText('great_league', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-violet-600 font-mono">{getUIText('great_league_cp', selectedLanguage)}</div>
                 </button>
 
                 <button
                   onClick={() => insertCPRange('cp0-2500')}
                   className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                 >
-                  <div className="font-bold text-sm sm:text-base text-blue-800 mb-1">Ultra League</div>
-                  <div className="text-[10px] sm:text-xs text-blue-600 font-mono">CP 0-2500</div>
+                  <div className="font-bold text-sm sm:text-base text-blue-800 mb-1">{getUIText('ultra_league', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-blue-600 font-mono">{getUIText('ultra_league_cp', selectedLanguage)}</div>
                 </button>
 
                 <button
                   onClick={() => insertCPRange('cp2500-')}
                   className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                 >
-                  <div className="font-bold text-sm sm:text-base text-amber-800 mb-1">Master League</div>
-                  <div className="text-[10px] sm:text-xs text-amber-600 font-mono">CP 2500+</div>
+                  <div className="font-bold text-sm sm:text-base text-amber-800 mb-1">{getUIText('master_league', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-amber-600 font-mono">{getUIText('master_league_cp', selectedLanguage)}</div>
                 </button>
 
                 <button
                   onClick={() => insertCPRange('cp0-500')}
                   className="group relative p-3 sm:p-4 rounded-xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                 >
-                  <div className="font-bold text-sm sm:text-base text-green-800 mb-1">Under 500 CP</div>
-                  <div className="text-[10px] sm:text-xs text-green-600 font-mono">CP 0-500</div>
+                  <div className="font-bold text-sm sm:text-base text-green-800 mb-1">{getUIText('under_500_cp', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-green-600 font-mono">{getUIText('under_500_cp_value', selectedLanguage)}</div>
                 </button>
 
                 <button
                   onClick={() => insertCPRange('cp3000-')}
                   className="group relative p-3 sm:p-4 rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                 >
-                  <div className="font-bold text-sm sm:text-base text-orange-800 mb-1">High CP</div>
-                  <div className="text-[10px] sm:text-xs text-orange-600 font-mono">CP 3000+</div>
+                  <div className="font-bold text-sm sm:text-base text-orange-800 mb-1">{getUIText('high_cp', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-orange-600 font-mono">{getUIText('high_cp_value', selectedLanguage)}</div>
                 </button>
 
                 <button
                   onClick={() => insertCPRange('cp4000-')}
                   className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                 >
-                  <div className="font-bold text-sm sm:text-base text-red-800 mb-1">Perfect CP</div>
-                  <div className="text-[10px] sm:text-xs text-red-600 font-mono">CP 4000+</div>
+                  <div className="font-bold text-sm sm:text-base text-red-800 mb-1">{getUIText('perfect_cp', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-red-600 font-mono">{getUIText('perfect_cp_value', selectedLanguage)}</div>
                 </button>
               </div>
             </div>
@@ -2409,7 +2570,7 @@ const PokemonGoSearchBuilder = () => {
             <div className="saved-searches-expand">
               {/* Generation Buttons */}
               <div className="mb-4">
-                <h4 className="text-xs font-bold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">Generations</h4>
+                <h4 className="text-xs font-bold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">{getUIText('generations', selectedLanguage)}</h4>
                 <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
                   {pokemonGenerations.map((gen) => (
                     <button
@@ -2426,7 +2587,7 @@ const PokemonGoSearchBuilder = () => {
 
               {/* Pokemon Group Buttons */}
               <div>
-                <h4 className="text-xs font-bold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">Pokemon Groups</h4>
+                <h4 className="text-xs font-bold text-gray-700 dark:text-slate-200 mb-3 uppercase tracking-wide">{getUIText('pokemon_groups', selectedLanguage)}</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                   {pokemonGroups.map((group) => (
                     <button
@@ -2530,7 +2691,7 @@ const PokemonGoSearchBuilder = () => {
                               <span className={`text-sm font-medium flex-1 ${
                                 isIncluded ? 'text-blue-800 dark:text-blue-200' : isExcluded ? 'text-red-800 dark:text-red-200' : 'text-gray-800 dark:text-slate-100'
                               }`}>
-                                {filter.label}
+                                {translateFilterLabel(filter, selectedLanguage)}
                               </span>
                               <div className="flex gap-1.5">
                                 <button
@@ -2545,7 +2706,7 @@ const PokemonGoSearchBuilder = () => {
                                       ? 'filter-button-plus-disabled'
                                       : 'filter-button-plus-default'
                                   }`}
-                                  title="Include"
+                                  title={getUIText('include', selectedLanguage)}
                                 >
                                   <Plus className="w-4 h-4" />
                                 </button>
@@ -2561,7 +2722,7 @@ const PokemonGoSearchBuilder = () => {
                                       ? 'filter-button-minus-disabled'
                                       : 'filter-button-minus-default'
                                   }`}
-                                  title="Exclude"
+                                  title={getUIText('exclude', selectedLanguage)}
                                 >
                                   <Minus className="w-4 h-4" />
                                 </button>
@@ -2579,6 +2740,7 @@ const PokemonGoSearchBuilder = () => {
                           onInclude={handleCustomAgeInclude}
                           onExclude={handleCustomAgeExclude}
                           onValueChange={handleCustomAgeValueChange}
+                          selectedLanguage={selectedLanguage}
                         />
                       )}
                     </div>
