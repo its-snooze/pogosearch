@@ -558,6 +558,58 @@ const PokemonGoSearchBuilder = () => {
         .find(f => f.id === id);
     };
 
+    // Helper function to combine consecutive year filters into ranges
+    const combineYearRanges = (timeFilterIds) => {
+      // Separate year filters from other time filters (age, distance)
+      const yearFilters = timeFilterIds.filter(id => id.startsWith('year'));
+      const otherTimeFilters = timeFilterIds.filter(id => !id.startsWith('year'));
+      
+      if (yearFilters.length === 0) {
+        // No year filters, return other time filters as-is
+        return otherTimeFilters.map(id => getFilterObject(id)?.value).filter(Boolean);
+      }
+      
+      // Extract years and sort them
+      const years = yearFilters
+        .map(id => {
+          const match = id.match(/year(\d{4})/);
+          return match ? parseInt(match[1], 10) : null;
+        })
+        .filter(year => year !== null)
+        .sort((a, b) => a - b);
+      
+      // Combine consecutive years into ranges
+      const yearRanges = [];
+      let rangeStart = years[0];
+      let rangeEnd = years[0];
+      
+      for (let i = 1; i < years.length; i++) {
+        if (years[i] === rangeEnd + 1) {
+          // Consecutive year, extend the range
+          rangeEnd = years[i];
+        } else {
+          // Gap found, save current range and start a new one
+          if (rangeStart === rangeEnd) {
+            yearRanges.push(`year${rangeStart}`);
+          } else {
+            yearRanges.push(`year${rangeStart}-${rangeEnd}`);
+          }
+          rangeStart = years[i];
+          rangeEnd = years[i];
+        }
+      }
+      
+      // Add the last range
+      if (rangeStart === rangeEnd) {
+        yearRanges.push(`year${rangeStart}`);
+      } else {
+        yearRanges.push(`year${rangeStart}-${rangeEnd}`);
+      }
+      
+      // Combine year ranges with other time filters
+      return [...yearRanges, ...otherTimeFilters.map(id => getFilterObject(id)?.value).filter(Boolean)];
+    };
+
     // Categorize filters
     const starRatings = ['4*', '3*', '2*', '1*', '0*'];
     const statFilters = ['4attack', '3attack', '4defense', '3defense', '4hp', '3hp', '0attack', '0defense', '0hp'];
@@ -567,6 +619,7 @@ const PokemonGoSearchBuilder = () => {
     const timeFilters = filterCategories.time.filters.map(f => f.id);
     const sizeFilters = filterCategories.size.filters.map(f => f.id);
     const moveFilters = filterCategories.moves.filters.map(f => f.id);
+    const regionFilters = filterCategories.regions.filters.map(f => f.id);
 
     // Separate included filters by category
     const includedStar = included.filter(id => starRatings.includes(id));
@@ -577,6 +630,7 @@ const PokemonGoSearchBuilder = () => {
     const includedTime = included.filter(id => timeFilters.includes(id));
     const includedSize = included.filter(id => sizeFilters.includes(id));
     const includedMoves = included.filter(id => moveFilters.includes(id));
+    const includedRegions = included.filter(id => regionFilters.includes(id));
 
     // Separate excluded filters by category
     const excludedStar = excluded.filter(id => starRatings.includes(id));
@@ -587,6 +641,7 @@ const PokemonGoSearchBuilder = () => {
     const excludedTime = excluded.filter(id => timeFilters.includes(id));
     const excludedSize = excluded.filter(id => sizeFilters.includes(id));
     const excludedMoves = excluded.filter(id => moveFilters.includes(id));
+    const excludedRegions = excluded.filter(id => regionFilters.includes(id));
 
     // Build parts of the search string
     const parts = [];
@@ -640,11 +695,9 @@ const PokemonGoSearchBuilder = () => {
       }
     }
 
-    // Time: Combine with commas (OR logic) if multiple
+    // Time: Combine with commas (OR logic) if multiple, with smart year range detection
     if (includedTime.length > 0) {
-      const timeValues = includedTime
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
+      const timeValues = combineYearRanges(includedTime);
       if (timeValues.length > 0) {
         parts.push(timeValues.join(','));
       }
@@ -667,6 +720,16 @@ const PokemonGoSearchBuilder = () => {
         .filter(Boolean);
       if (moveValues.length > 0) {
         parts.push(moveValues.join(','));
+      }
+    }
+
+    // Regions: Combine with commas (OR logic) if multiple
+    if (includedRegions.length > 0) {
+      const regionValues = includedRegions
+        .map(id => getFilterObject(id)?.value)
+        .filter(Boolean);
+      if (regionValues.length > 0) {
+        parts.push(regionValues.join(','));
       }
     }
 
@@ -721,9 +784,7 @@ const PokemonGoSearchBuilder = () => {
     }
 
     if (excludedTime.length > 0) {
-      const timeValues = excludedTime
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
+      const timeValues = combineYearRanges(excludedTime)
         .map(v => `!${v}`);
       if (timeValues.length > 0) {
         excludedParts.push(timeValues.join(','));
@@ -747,6 +808,16 @@ const PokemonGoSearchBuilder = () => {
         .map(v => `!${v}`);
       if (moveValues.length > 0) {
         excludedParts.push(moveValues.join(','));
+      }
+    }
+
+    if (excludedRegions.length > 0) {
+      const regionValues = excludedRegions
+        .map(id => getFilterObject(id)?.value)
+        .filter(Boolean)
+        .map(v => `!${v}`);
+      if (regionValues.length > 0) {
+        excludedParts.push(regionValues.join(','));
       }
     }
 
