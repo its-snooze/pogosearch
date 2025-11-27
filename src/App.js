@@ -7,66 +7,7 @@ import {
 import { translateSearchString, translateTerm, translateToEnglish, getAvailableLanguages, getLocale } from './utils/translation';
 import { getUIText } from './translations/uiTranslations';
 import CustomAgeInput from './components/CustomAgeInput';
-
-// Validation function for Pokemon GO search strings
-function validateSearchString(str) {
-  if (!str || str.trim() === '') {
-    return { valid: true };
-  }
-  
-  // Check for spaces
-  if (str.includes(' ')) {
-    return { 
-      valid: false, 
-      errorKey: 'remove_spaces'
-    };
-  }
-  
-  // Check for numbers followed directly by letters (missing &)
-  // Pattern: Pokedex numbers (digits and commas) followed directly by a letter
-  // This catches cases like "373shadow" or "409,464shadow"
-  // We match: start of string or &, then comma-separated digits (Pokedex numbers), then a letter
-  // This distinguishes from valid filters like "3attack" (single number, no comma) or "4*" (has *)
-  const missingAmpersandPattern = /(?:^|&)(\d+(?:,\d+)+)([a-z])/;
-  if (missingAmpersandPattern.test(str)) {
-    return { 
-      valid: false, 
-      errorKey: 'missing_ampersand'
-    };
-  }
-  
-  // Also check for single Pokedex number followed by letters (e.g., "373shadow")
-  // But exclude valid single-digit filters like "3attack" by checking if it's a known filter pattern
-  // We'll check if a single number followed by letters appears at start or after &
-  const singleNumberPattern = /(?:^|&)(\d{2,})([a-z])/;
-  if (singleNumberPattern.test(str)) {
-    // This catches multi-digit numbers (Pokedex numbers) followed by letters
-    // Single digit + letter might be a valid filter (e.g., "3attack"), so we allow those
-    return { 
-      valid: false, 
-      errorKey: 'missing_ampersand'
-    };
-  }
-  
-  // Check for & between consecutive Pokedex numbers
-  // Split by & and check if adjacent parts are both Pokedex number lists
-  const parts = str.split('&');
-  for (let i = 0; i < parts.length - 1; i++) {
-    const currentPart = parts[i].trim();
-    const nextPart = parts[i + 1].trim();
-    
-    // Check if both parts are Pokedex numbers (only digits and commas)
-    // This catches "373&409" which should be "373,409"
-    if (/^[\d,]+$/.test(currentPart) && /^[\d,]+$/.test(nextPart)) {
-      return { 
-        valid: false, 
-        errorKey: 'use_commas'
-      };
-    }
-  }
-  
-  return { valid: true };
-}
+import { parseSearchString, validateSearchString, buildSearchString as buildSearchStringFromParser } from './utils/searchParser';
 
 // Category metadata with colors and icons - names will be translated in component
 const categoryMeta = {
@@ -474,49 +415,43 @@ const PokemonGoSearchBuilder = () => {
   // Check for conflicts
   const getConflicts = useCallback((included, excluded) => {
     const conflicts = [];
-    const allFilters = [...included, ...excluded];
     
-    // Check for include/exclude conflicts on same filter
-    included.forEach(filter => {
-      if (excluded.includes(filter)) {
-        const filterDef = Object.values(filterCategories)
-          .flatMap(cat => cat.filters)
-          .find(f => f.id === filter);
-        conflicts.push(`${filterDef?.label || filter} cannot be both included and excluded`);
-      }
-    });
+    // Map filter IDs to filter values for the parser
+    const includedValues = included.map(filterId => {
+      const filter = Object.values(filterCategories)
+        .flatMap(cat => cat.filters)
+        .find(f => f.id === filterId);
+      return filter?.value;
+    }).filter(Boolean);
     
-    // Check for multiple star ratings (mutually exclusive)
-    const starRatings = ['4*', '3*', '2*', '1*', '0*'];
-    const selectedStars = allFilters.filter(f => starRatings.includes(f));
-    if (selectedStars.length > 1) {
-      const starLabels = selectedStars.map(id => {
-        const filterDef = Object.values(filterCategories)
-          .flatMap(cat => cat.filters)
-          .find(f => f.id === id);
-        return filterDef?.label || id;
-      });
-      conflicts.push(`Star ratings are mutually exclusive. Cannot select multiple: ${starLabels.join(', ')}`);
+    const excludedValues = excluded.map(filterId => {
+      const filter = Object.values(filterCategories)
+        .flatMap(cat => cat.filters)
+        .find(f => f.id === filterId);
+      return filter?.value;
+    }).filter(Boolean);
+    
+    // Build a test search string
+    const testString = buildSearchStringFromParser(includedValues, excludedValues);
+    
+    // Parse and check for conflicts
+    const result = parseSearchString(testString);
+    
+    // Convert parser conflicts to user-friendly messages
+    if (result.conflicts && result.conflicts.length > 0) {
+      conflicts.push(...result.conflicts.map(conflict => conflict.message));
     }
     
-    // Check for filter definition conflicts
-    allFilters.forEach(filter => {
-      const filterDef = Object.values(filterCategories)
-        .flatMap(cat => cat.filters)
-        .find(f => f.id === filter);
-      
-      if (filterDef?.conflicts) {
-        filterDef.conflicts.forEach(conflictId => {
-          if (allFilters.includes(conflictId)) {
-            conflicts.push(`${filterDef.label} conflicts with ${
-              Object.values(filterCategories)
-                .flatMap(cat => cat.filters)
-                .find(f => f.id === conflictId)?.label
-            }`);
-          }
-        });
+    // Also check for include/exclude conflicts on same filter (legacy check)
+    included.forEach(filterId => {
+      if (excluded.includes(filterId)) {
+        const filterDef = Object.values(filterCategories)
+          .flatMap(cat => cat.filters)
+          .find(f => f.id === filterId);
+        conflicts.push(`${filterDef?.label || filterId} cannot be both included and excluded`);
       }
     });
+    
     return [...new Set(conflicts)];
   }, []);
 
@@ -551,7 +486,7 @@ const PokemonGoSearchBuilder = () => {
   // - Commas (,) for OR logic (types, multiple special statuses)
   // - Ampersands (&) for AND logic (combining different filter categories)
   // - Exclamation (!) for NOT (goes before the term)
-  // - Star ratings are mutually exclusive (only one can be selected)
+  // - Star ratings can be OR'd together with commas (e.g., "3*,4*" means 3* OR 4*)
   // - Pokedex numbers are preserved from ref (extracted from search string)
   // - Terms are translated to selected language before output
   const buildSearchString = useCallback((included, excluded) => {
@@ -681,15 +616,14 @@ const PokemonGoSearchBuilder = () => {
       }
     }
 
-    // Special status: Push each as separate part (AND logic with &)
-    // This ensures filters like shiny&costume work correctly
+    // Special status: Combine with commas (OR logic) if multiple
     if (includedSpecial.length > 0) {
-      includedSpecial.forEach(id => {
-        const filter = getFilterObject(id);
-        if (filter?.value) {
-          parts.push(filter.value);
-        }
-      });
+      const specialValues = includedSpecial
+        .map(id => getFilterObject(id)?.value)
+        .filter(Boolean);
+      if (specialValues.length > 0) {
+        parts.push(specialValues.join(','));
+      }
     }
 
     // Evolution: Combine with commas (OR logic) if multiple
@@ -930,19 +864,24 @@ const PokemonGoSearchBuilder = () => {
   // Validate search string whenever it changes
   React.useEffect(() => {
     const validation = validateSearchString(searchString);
-    // Translate error message if there's an errorKey
-    if (!validation.valid && validation.errorKey) {
+    
+    // Convert parser errors to display format
+    if (!validation.valid && validation.errors && validation.errors.length > 0) {
+      // Get the first error message (or combine all if multiple)
+      const errorMessages = validation.errors.map(err => err.message || err);
       setValidationResult({
         valid: false,
-        error: getUIText(validation.errorKey, selectedLanguage)
+        error: errorMessages.length === 1 ? errorMessages[0] : errorMessages.join('; ')
       });
     } else {
-      setValidationResult(validation);
+      setValidationResult({ valid: validation.valid });
     }
     
     // Console warning during development
     if (!validation.valid && process.env.NODE_ENV === 'development') {
-      const errorMsg = validation.errorKey ? getUIText(validation.errorKey, selectedLanguage) : validation.error;
+      const errorMsg = validation.errors && validation.errors.length > 0 
+        ? validation.errors.map(e => e.message || e).join('; ')
+        : 'Invalid search string';
       console.warn(`Invalid search string: "${searchString}" - ${errorMsg}`);
     }
   }, [searchString, selectedLanguage]);
@@ -956,11 +895,7 @@ const PokemonGoSearchBuilder = () => {
         // Remove from excluded if it's there
         setExcludedFilters(prevExcluded => prevExcluded.filter(id => id !== filterId));
         
-        // Star ratings are mutually exclusive - remove other star ratings
-        const starRatings = ['4*', '3*', '2*', '1*', '0*'];
-        if (starRatings.includes(filterId)) {
-          return [...prev.filter(id => !starRatings.includes(id)), filterId];
-        }
+        // Allow multiple star ratings (they'll be OR'd together with commas)
         
         return [...prev, filterId];
       }
@@ -976,11 +911,7 @@ const PokemonGoSearchBuilder = () => {
         // Remove from included if it's there
         setIncludedFilters(prevIncluded => prevIncluded.filter(id => id !== filterId));
         
-        // Star ratings are mutually exclusive - remove other star ratings
-        const starRatings = ['4*', '3*', '2*', '1*', '0*'];
-        if (starRatings.includes(filterId)) {
-          return [...prev.filter(id => !starRatings.includes(id)), filterId];
-        }
+        // Allow multiple star ratings (they'll be OR'd together with commas)
         
         return [...prev, filterId];
       }
@@ -1046,11 +977,8 @@ const PokemonGoSearchBuilder = () => {
   // Handles Pokemon GO syntax: filters separated by &, comma-separated values within parts
   // Also handles translated search strings by converting them to English first
   const parseSearchStringToFilters = (searchStr) => {
-    const includedIds = [];
-    const excludedIds = [];
-    
     if (!searchStr || searchStr.trim() === '') {
-      return { included: includedIds, excluded: excludedIds };
+      return { included: [], excluded: [] };
     }
     
     // Translate to English first if needed (for parsing)
@@ -1061,38 +989,38 @@ const PokemonGoSearchBuilder = () => {
       englishSearchStr = translateToEnglish(searchStr, selectedLanguage);
     }
     
-    // Split by & to get filter parts (no spaces)
-    const parts = englishSearchStr.split('&').map(p => p.trim()).filter(p => p);
+    // Use the new parser to extract filters
+    const result = parseSearchString(englishSearchStr);
     
-    // Process each part
-    parts.forEach(part => {
-      // Check if this part is Pokemon numbers (comma-separated digits)
-      // If it's all digits and commas, skip it (it's a Pokedex number list)
-      const isPokemonNumbers = /^[\d,]+$/.test(part);
-      if (isPokemonNumbers) {
-        return; // Skip Pokemon number parts
+    // Map filter values to filter IDs
+    const includedIds = [];
+    const excludedIds = [];
+    
+    // Map included filter values to IDs
+    result.included.forEach(filterValue => {
+      // Skip Pokedex numbers (all digits and commas)
+      if (/^[\d,]+$/.test(filterValue)) {
+        return;
       }
       
-      // Handle comma-separated filters like "shadow,mega,primal" or "fire,water,grass"
-      const filters = part.split(',').map(f => f.trim()).filter(f => f);
+      const filter = Object.values(filterCategories)
+        .flatMap(cat => cat.filters)
+        .find(f => f.value === filterValue);
       
-      filters.forEach(filterValue => {
-        const isExcluded = filterValue.startsWith('!');
-        const cleanValue = isExcluded ? filterValue.substring(1) : filterValue;
-        
-        // Find the filter ID that matches this value (using English values)
-        const filter = Object.values(filterCategories)
-          .flatMap(cat => cat.filters)
-          .find(f => f.value === cleanValue);
-        
-        if (filter) {
-          if (isExcluded) {
-            excludedIds.push(filter.id);
-          } else {
-            includedIds.push(filter.id);
-          }
-        }
-      });
+      if (filter) {
+        includedIds.push(filter.id);
+      }
+    });
+    
+    // Map excluded filter values to IDs
+    result.excluded.forEach(filterValue => {
+      const filter = Object.values(filterCategories)
+        .flatMap(cat => cat.filters)
+        .find(f => f.value === filterValue);
+      
+      if (filter) {
+        excludedIds.push(filter.id);
+      }
     });
     
     return { included: includedIds, excluded: excludedIds };
@@ -1103,10 +1031,19 @@ const PokemonGoSearchBuilder = () => {
     const validation = validateSearchString(searchString);
     if (!validation.valid) {
       if (process.env.NODE_ENV === 'development') {
-        console.warn(`Cannot copy invalid search string: "${searchString}" - ${validation.error}`);
+        const errorMsg = validation.errors && validation.errors.length > 0 
+          ? validation.errors.map(e => e.message || e).join('; ')
+          : 'Invalid search string';
+        console.warn(`Cannot copy invalid search string: "${searchString}" - ${errorMsg}`);
       }
       // Still allow copying, but show validation error
-      setValidationResult(validation);
+      const errorMessages = validation.errors && validation.errors.length > 0
+        ? validation.errors.map(err => err.message || err)
+        : ['Invalid search string'];
+      setValidationResult({
+        valid: false,
+        error: errorMessages.length === 1 ? errorMessages[0] : errorMessages.join('; ')
+      });
       return;
     }
     
@@ -1213,13 +1150,17 @@ const PokemonGoSearchBuilder = () => {
     // Handle type filters (game terms)
     const typeNames = ['normal', 'fire', 'water', 'electric', 'grass', 'ice', 'fighting', 'poison', 'ground', 'flying', 'psychic', 'bug', 'rock', 'ghost', 'dragon', 'dark', 'steel', 'fairy'];
     if (typeNames.includes(filterId)) {
-      return translateTerm(filterId, language, 'name');
+      const translated = translateTerm(filterId, language, 'name');
+      // Capitalize first letter for display (search string stays lowercase)
+      return translated.charAt(0).toUpperCase() + translated.slice(1);
     }
     
     // Handle special status filters (game terms)
     const specialStatus = ['shiny', 'lucky', 'shadow', 'purified', 'legendary', 'mythical', 'ultrabeast', 'dynamax', 'gigantamax', 'costume', 'background', 'locationbackground', 'specialbackground', 'hatched', 'eggsonly', 'traded', 'alolan', 'galarian', 'hisuian', 'paldean', 'defender', 'favorite'];
     if (specialStatus.includes(filterId)) {
-      return translateTerm(filterId, language, 'name');
+      const translated = translateTerm(filterId, language, 'name');
+      // Capitalize first letter for display (search string stays lowercase)
+      return translated.charAt(0).toUpperCase() + translated.slice(1);
     }
     
     // Handle region filters (game terms)
@@ -1633,57 +1574,57 @@ const PokemonGoSearchBuilder = () => {
   ], [selectedLanguage]);
 
   // Premade search presets
-  const premadeSearches = {
+  const premadeSearches = useMemo(() => ({
     sTierShadow: {
-      label: 'S-Tier Shadows',
-      description: 'Shadow Pokemon - apex of power',
+      label: getUIText('premade_s_tier_shadows', selectedLanguage),
+      description: getUIText('premade_s_tier_shadows_desc', selectedLanguage),
       searchString: '373,409,464,484,150,485,383,483&shadow',
       tier: 'S',
       type: 'Shadow'
     },
     sTierNonShadow: {
-      label: 'S-Tier Non-Shadow',
-      description: 'Mega/Primal Pokemon - top priorities',
+      label: getUIText('premade_s_tier_nonshadow', selectedLanguage),
+      description: getUIText('premade_s_tier_nonshadow_desc', selectedLanguage),
       searchString: '889,888,646,382,383,384,448,94,719,6,257,890,800',
       tier: 'S',
       type: 'Non-Shadow'
     },
     aPlusTierShadow: {
-      label: 'A+ Tier Shadows',
-      description: 'Shadow Pokemon - stand at or near the top',
+      label: getUIText('premade_aplus_tier_shadows', selectedLanguage),
+      description: getUIText('premade_aplus_tier_shadows_desc', selectedLanguage),
       searchString: '697,248,260,486,243,146,376,473,462,68,382,635,250,526,94,282,445,530,466,149,555,534,609,257&shadow',
       tier: 'A+',
       type: 'Shadow'
     },
     aPlusTierNonShadow: {
-      label: 'A+ Tier Non-Shadow',
-      description: 'Mega Pokemon - stand at or near the top',
+      label: getUIText('premade_aplus_tier_nonshadow', selectedLanguage),
+      description: getUIText('premade_aplus_tier_nonshadow_desc', selectedLanguage),
       searchString: '644,796,639,464,643,894,384,484,248,260,254,376,310,381,282,445,142,359,460,448,645,798&mega',
       tier: 'A+',
       type: 'Non-Shadow'
     },
     aTierShadow: {
-      label: 'A-Tier Shadows',
-      description: 'Shadow Pokemon - gold-standard worthy of investment',
+      label: getUIText('premade_a_tier_shadows', selectedLanguage),
+      description: getUIText('premade_a_tier_shadows_desc', selectedLanguage),
       searchString: '145,461,738,398,254,381,430,297,487,244,500,142,359&shadow',
       tier: 'A',
       type: 'Shadow'
     },
     aTierNonShadow: {
-      label: 'A-Tier Non-Shadow',
-      description: 'Mega Pokemon - gold-standard worthy of investment',
+      label: getUIText('premade_a_tier_nonshadow', selectedLanguage),
+      description: getUIText('premade_a_tier_nonshadow_desc', selectedLanguage),
       searchString: '717,637,892,248,642,492,373,895,409,484,150,376,3,18,380,229,214,362,354,181,65,473,792,382,647,635,720,485,383,487,445,905,483,491,534,609,806,998&mega',
       tier: 'A',
       type: 'Non-Shadow'
     },
     top25MasterLeague: {
-      label: 'Top 25 Master League',
-      description: 'Top ranked Pokemon for Master League PvP competitive battling',
+      label: getUIText('premade_top25_master_league', selectedLanguage),
+      description: getUIText('premade_top25_master_league_desc', selectedLanguage),
       searchString: '888,484,889,483,646,644,643,249,376,890,800,792,250,383,381,648,671,468,791',
       tier: 'PvP',
       type: 'Master League'
     }
-  };
+  }), [selectedLanguage]);
 
   const applyPremadeSearch = async (searchKey, event) => {
     const preset = premadeSearches[searchKey];
@@ -1691,7 +1632,10 @@ const PokemonGoSearchBuilder = () => {
       // Validate the premade search string
       const validation = validateSearchString(preset.searchString);
       if (!validation.valid && process.env.NODE_ENV === 'development') {
-        console.warn(`Premade search "${searchKey}" has invalid syntax: "${preset.searchString}" - ${validation.error}`);
+        const errorMsg = validation.errors && validation.errors.length > 0 
+          ? validation.errors.map(e => e.message || e).join('; ')
+          : 'Invalid search string';
+        console.warn(`Premade search "${searchKey}" has invalid syntax: "${preset.searchString}" - ${errorMsg}`);
       }
       
       // Extract and preserve Pokedex numbers from the premade search string
@@ -1916,8 +1860,8 @@ const PokemonGoSearchBuilder = () => {
                   >
                     <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
                     {showValidationTooltip && (
-                      <div className="absolute left-0 top-full mt-2 z-50 px-3 py-2 bg-amber-50 border-2 border-amber-400 rounded-lg shadow-xl whitespace-nowrap">
-                        <p className="text-xs font-semibold text-amber-800">
+                      <div className="absolute left-0 top-full mt-2 z-50 px-3 py-2 bg-amber-50 dark:bg-amber-900/80 border-2 border-amber-400 dark:border-amber-500 rounded-lg shadow-xl max-w-xs">
+                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
                           {validationResult.error}
                         </p>
                       </div>
@@ -2224,28 +2168,28 @@ const PokemonGoSearchBuilder = () => {
                 />
               </button>
             </div>
-            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">Raid tiers, PvP, and common combos</p>
+            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">{getUIText('premade_section_title', selectedLanguage)}</p>
           </div>
 
           {showQuickSearches && (
             <div className="saved-searches-expand">
               {/* PvP & Competitive Subsection */}
               <div className="mb-6">
-                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">PvP & Competitive</h3>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">{getUIText('premade_pvp_competitive', selectedLanguage)}</h3>
                 
                 {/* Raid Tier Attackers */}
                 <div className="mb-5">
-                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">Raid Tier Attackers</h4>
+                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-orange-500 to-red-500 bg-clip-text text-transparent">{getUIText('premade_raid_attackers', selectedLanguage)}</h4>
                   <div className="mb-3 p-3 bg-blue-50/80 border border-blue-200 rounded-lg dark:bg-slate-900/60 dark:border-blue-500/30">
-                    <p className="text-xs text-blue-800 font-semibold mb-1 dark:text-blue-200">ℹ️ Shadow vs Non-Shadow</p>
+                    <p className="text-xs text-blue-800 font-semibold mb-1 dark:text-blue-200">ℹ️ {getUIText('info_shadow_vs_nonshadow_title', selectedLanguage)}</p>
                     <p className="text-xs text-blue-700 leading-relaxed dark:text-blue-100">
-                      Pokemon GO cannot display Shadow and non-Shadow versions simultaneously. Use separate searches.
+                      {getUIText('info_shadow_vs_nonshadow_text', selectedLanguage)}
                     </p>
                   </div>
                   
                   {/* S-Tier */}
                   <div className="mb-4">
-                    <h5 className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">S-Tier • Apex of Power</h5>
+                    <h5 className="text-xs font-bold text-amber-700 mb-2 uppercase tracking-wide">{getUIText('tier_s_label', selectedLanguage)} • {getUIText('tier_s_description', selectedLanguage)}</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <button
                         onClick={(e) => applyPremadeSearch('sTierShadow', e)}
@@ -2255,7 +2199,9 @@ const PokemonGoSearchBuilder = () => {
                           <span className="font-bold text-sm sm:text-base text-red-800">
                             {premadeSearches.sTierShadow.label}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">
+                            {getUIText('badge_shadow', selectedLanguage)}
+                          </span>
                         </div>
                         <div className="text-[10px] sm:text-xs text-red-700">
                           {premadeSearches.sTierShadow.description}
@@ -2269,7 +2215,9 @@ const PokemonGoSearchBuilder = () => {
                           <span className="font-bold text-sm sm:text-base text-amber-800">
                             {premadeSearches.sTierNonShadow.label}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full font-bold">MEGA/PRIMAL</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded-full font-bold">
+                            {getUIText('badge_mega_primal', selectedLanguage)}
+                          </span>
                         </div>
                         <div className="text-[10px] sm:text-xs text-amber-700">
                           {premadeSearches.sTierNonShadow.description}
@@ -2280,7 +2228,7 @@ const PokemonGoSearchBuilder = () => {
 
                   {/* A+ Tier */}
                   <div className="mb-4">
-                    <h5 className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">A+ Tier • Stand at or Near the Top</h5>
+                    <h5 className="text-xs font-bold text-blue-700 mb-2 uppercase tracking-wide">{getUIText('tier_aplus_label', selectedLanguage)} • {getUIText('tier_aplus_description', selectedLanguage)}</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <button
                         onClick={(e) => applyPremadeSearch('aPlusTierShadow', e)}
@@ -2290,7 +2238,9 @@ const PokemonGoSearchBuilder = () => {
                           <span className="font-bold text-sm sm:text-base text-red-800">
                             {premadeSearches.aPlusTierShadow.label}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">
+                            {getUIText('badge_shadow', selectedLanguage)}
+                          </span>
                         </div>
                         <div className="text-[10px] sm:text-xs text-red-700">
                           {premadeSearches.aPlusTierShadow.description}
@@ -2304,7 +2254,9 @@ const PokemonGoSearchBuilder = () => {
                           <span className="font-bold text-sm sm:text-base text-blue-800">
                             {premadeSearches.aPlusTierNonShadow.label}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded-full font-bold">MEGA</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-blue-200 text-blue-800 rounded-full font-bold">
+                            {getUIText('badge_mega', selectedLanguage)}
+                          </span>
                         </div>
                         <div className="text-[10px] sm:text-xs text-blue-700">
                           {premadeSearches.aPlusTierNonShadow.description}
@@ -2315,7 +2267,7 @@ const PokemonGoSearchBuilder = () => {
 
                   {/* A Tier */}
                   <div className="mb-4">
-                    <h5 className="text-xs font-bold text-emerald-700 mb-2 uppercase tracking-wide">A Tier • Gold-Standard Investment</h5>
+                    <h5 className="text-xs font-bold text-emerald-700 mb-2 uppercase tracking-wide">{getUIText('tier_a_label', selectedLanguage)} • {getUIText('tier_a_description', selectedLanguage)}</h5>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                       <button
                         onClick={(e) => applyPremadeSearch('aTierShadow', e)}
@@ -2325,7 +2277,9 @@ const PokemonGoSearchBuilder = () => {
                           <span className="font-bold text-sm sm:text-base text-red-800">
                             {premadeSearches.aTierShadow.label}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">SHADOW</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-red-200 text-red-800 rounded-full font-bold">
+                            {getUIText('badge_shadow', selectedLanguage)}
+                          </span>
                         </div>
                         <div className="text-[10px] sm:text-xs text-red-700">
                           {premadeSearches.aTierShadow.description}
@@ -2339,7 +2293,9 @@ const PokemonGoSearchBuilder = () => {
                           <span className="font-bold text-sm sm:text-base text-emerald-800">
                             {premadeSearches.aTierNonShadow.label}
                           </span>
-                          <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded-full font-bold">MEGA</span>
+                          <span className="text-[10px] px-1.5 py-0.5 bg-emerald-200 text-emerald-800 rounded-full font-bold">
+                            {getUIText('badge_mega', selectedLanguage)}
+                          </span>
                         </div>
                         <div className="text-[10px] sm:text-xs text-emerald-700">
                           {premadeSearches.aTierNonShadow.description}
@@ -2351,11 +2307,11 @@ const PokemonGoSearchBuilder = () => {
 
                 {/* Master League PvP */}
                 <div>
-                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">Master League PvP</h4>
+                  <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-blue-500 bg-clip-text text-transparent">{getUIText('premade_master_league', selectedLanguage)}</h4>
                   <div className="mb-3 p-3 bg-indigo-50/80 border border-indigo-200 rounded-lg dark:bg-slate-900/60 dark:border-indigo-500/30">
-                    <p className="text-xs text-indigo-800 font-semibold mb-1 dark:text-indigo-200">ℹ️ Master League Rankings</p>
+                    <p className="text-xs text-indigo-800 font-semibold mb-1 dark:text-indigo-200">ℹ️ {getUIText('info_master_league_title', selectedLanguage)}</p>
                     <p className="text-xs text-indigo-700 leading-relaxed dark:text-indigo-100">
-                      Based on Master League PvP rankings for competitive battling. Includes top-ranked Pokemon like Zacian (Crowned Sword), Palkia (Origin & Shadow), Zamazenta (Crowned Shield), Dialga (Origin & Shadow), Kyurem (White & Black), Zekrom, Reshiram, Lugia, Metagross, Eternatus, Necrozma, Lunala, Ho-Oh, Groudon, Latios, Meloetta, Florges, Togekiss, and Solgaleo.
+                      {getUIText('info_master_league_text', selectedLanguage)}
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
@@ -2379,7 +2335,7 @@ const PokemonGoSearchBuilder = () => {
 
               {/* Common Combos Subsection */}
               <div>
-                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">Common Combos</h3>
+                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">{getUIText('premade_common_combos', selectedLanguage)}</h3>
                 <h4 className="text-xs font-bold mb-3 uppercase tracking-wide bg-gradient-to-r from-purple-500 to-pink-500 bg-clip-text text-transparent">{getUIText('quick_combos', selectedLanguage)}</h4>
                 <div className="mb-3 p-3 bg-purple-50/80 border border-purple-200 rounded-lg dark:bg-slate-900/60 dark:border-purple-500/30">
                   <p className="text-xs text-purple-800 font-semibold mb-1 dark:text-purple-200">ℹ️ {getUIText('quick_combos', selectedLanguage)}</p>
@@ -2421,7 +2377,7 @@ const PokemonGoSearchBuilder = () => {
 
                   <Tooltip text={getUIText('trade_fodder_desc', selectedLanguage)}>
                     <button
-                      onClick={() => appendFilterCombo('&!favorite&!shiny&0*,1*')}
+                      onClick={() => appendFilterCombo('&0*&!favorite')}
                       className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
                     >
                       <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('trade_fodder', selectedLanguage)}</div>
@@ -2568,7 +2524,7 @@ const PokemonGoSearchBuilder = () => {
                 />
               </button>
             </div>
-            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">Quick insert Pokemon ranges and groups</p>
+            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">{getUIText('quick_insert_pokemon', selectedLanguage)}</p>
           </div>
 
           {showPokemonSelection && (
