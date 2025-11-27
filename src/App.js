@@ -650,12 +650,14 @@ const PokemonGoSearchBuilder = () => {
     // Build parts of the search string
     const parts = [];
 
-    // Star ratings: Only one can be included (mutually exclusive)
-    // If multiple are selected, use the first one (or handle conflict)
+    // Star ratings: Combine with commas (OR logic) if multiple
+    // This allows searches like 0*,1* for trade fodder
     if (includedStar.length > 0) {
-      const filter = getFilterObject(includedStar[0]);
-      if (filter?.value) {
-        parts.push(filter.value);
+      const starValues = includedStar
+        .map(id => getFilterObject(id)?.value)
+        .filter(Boolean);
+      if (starValues.length > 0) {
+        parts.push(starValues.join(','));
       }
     }
 
@@ -679,14 +681,15 @@ const PokemonGoSearchBuilder = () => {
       }
     }
 
-    // Special status: Combine with commas (OR logic) if multiple
+    // Special status: Push each as separate part (AND logic with &)
+    // This ensures filters like shiny&costume work correctly
     if (includedSpecial.length > 0) {
-      const specialValues = includedSpecial
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (specialValues.length > 0) {
-        parts.push(specialValues.join(','));
-      }
+      includedSpecial.forEach(id => {
+        const filter = getFilterObject(id);
+        if (filter?.value) {
+          parts.push(filter.value);
+        }
+      });
     }
 
     // Evolution: Combine with commas (OR logic) if multiple
@@ -745,9 +748,12 @@ const PokemonGoSearchBuilder = () => {
     const excludedParts = [];
 
     if (excludedStar.length > 0) {
-      const filter = getFilterObject(excludedStar[0]);
-      if (filter?.value) {
-        excludedParts.push(`!${filter.value}`);
+      const starValues = excludedStar
+        .map(id => getFilterObject(id)?.value)
+        .filter(Boolean)
+        .map(v => `!${v}`);
+      if (starValues.length > 0) {
+        excludedParts.push(starValues.join(','));
       }
     }
 
@@ -772,13 +778,12 @@ const PokemonGoSearchBuilder = () => {
     }
 
     if (excludedSpecial.length > 0) {
-      const specialValues = excludedSpecial
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (specialValues.length > 0) {
-        excludedParts.push(specialValues.join(','));
-      }
+      excludedSpecial.forEach(id => {
+        const filter = getFilterObject(id);
+        if (filter?.value) {
+          excludedParts.push(`!${filter.value}`);
+        }
+      });
     }
 
     if (excludedEvolution.length > 0) {

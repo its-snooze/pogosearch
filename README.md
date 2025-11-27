@@ -1,96 +1,173 @@
-# Pokemon GO Search String Builder
+# 🔍 Pokémon GO Search Builder
 
-> An open-source tool to build Pokemon GO search strings without memorizing syntax
+**Build powerful Pokemon GO search strings visually - no syntax memorization required!**
 
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K0ZNM6K)
+[![Live App](https://img.shields.io/badge/Live-pogosearch-blue?style=for-the-badge)](https://its-snooze.github.io/pogosearch)
+[![Discord](https://img.shields.io/badge/Discord-Join-7289DA?style=for-the-badge&logo=discord)](https://discord.gg/X9zqC3quKR)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
-## 🎮 Live Demo
-
-**[Launch Tool →](https://its-snooze.github.io/pogosearch)**
+---
 
 ## ✨ Features
 
-- **200+ Filters** across 7 categories
+### 🎮 Core Functionality
+- **Visual Filter Builder** - Click filters instead of memorizing syntax
+- **200+ Search Operators** - Every Pokemon GO search term supported
+- **Smart Validation** - Catches syntax errors before you paste
+- **One-Click Copy** - Copy and paste directly into Pokemon GO
 
-- **Include/Exclude System** - Add (+) or exclude (-) any filter
+### 🌍 Multi-Language Support (WIP)
+- **15 Languages** - English, Spanish, French, German, Japanese, Korean, Chinese, Portuguese, Italian, Russian, Hindi, Indonesian, Thai, Turkish
+- **Auto-Translation** - Search strings automatically generated in your selected language
+- **Game-Accurate** - Uses official Pokemon GO terminology for each language
 
-- **Complete Coverage**:
+### 📱 Progressive Web App
+- **Install on Mobile** - Works offline as a phone app
+- **Cross-Platform** - Android, iOS, Desktop
+- **Fast & Lightweight** - No ads, no tracking
 
-  - All IV star ratings and specific stat filters
+### 🎯 Premade Searches
+- **PvP Tier Lists** - S/A+/A tier shadows and non-shadows
+- **Quick Combos** - Shiny legendaries, perfect shadows, trade fodder, etc.
+- **CP Ranges** - Great League, Ultra League, Master League caps
+- **Pokemon Groups** - Starters, Eeveelutions, Pseudo-Legendaries, by generation
 
-  - All 18 Pokemon types
+### 💾 Save & Share
+- **Save Searches** - Store up to 15 custom searches
+- **Import/Export** - Backup and restore your searches
+- **Search History** - Quick access to recent searches
 
-  - Year filters (2016-2021) for lucky trade searching
+### 🎨 Customization
+- **Dark/Light Mode** - Easy on the eyes
+- **Custom Age Ranges** - Flexible date filters for Catch Cup
+- **Smart Year Formatting** - Auto-combines consecutive years (year2016-2017)
 
-  - Regional forms (Alolan, Galarian, Hisuian, Paldean)
+---
 
-  - Complete move slot filters (@1/@2/@3 for all types)
+## 🚀 Quick Start
 
-  - Evolution filters (evolvenew, item, tradeevolve)
+### Web App
+1. Visit **[https://its-snooze.github.io/pogosearch](https://its-snooze.github.io/pogosearch)**
+2. Click the filters you want
+3. Copy the search string
+4. Paste into Pokemon GO
 
-  - Background filters (location, special, event backgrounds)
+### Install as App (PWA)
+**Android/iOS:**
+1. Open in browser
+2. Tap share/menu button
+3. Select "Add to Home Screen"
+4. Use like a native app!
 
-  - Buddy levels, sizes, gender filters
+**Desktop (Chrome/Edge):**
+1. Click the install icon in address bar
+2. Or go to Settings → Install Pogosearch
 
-- **Active Filter Chips** - Visual display of selected filters with quick removal
+---
 
-- **Saved Searches** - Bookmark frequently used searches
+## 📖 How to Use
 
-- **Dark Mode** - Easy on the eyes
+### Building a Search
 
-- **Mobile Friendly** - Works seamlessly on all devices
+**Select filters from categories:**
+- **Stats & IVs** - Perfect (4★), High IV (3★), specific stat ranges
+- **Types** - All 18 Pokemon types
+- **Special Status** - Shiny, Shadow, Lucky, Legendary, etc.
+- **Evolution & Buddy** - Can evolve, mega level, buddy status
+- **Time & Distance** - Caught dates, years, distance from location
+- **Size & Gender** - XXS/XXL, male/female/genderless
+- **Moves** - Fast moves, charged moves, legacy moves
+- **Regions** - Kanto, Johto, Hoenn, etc.
 
-- **Copy to Clipboard** - One-click copy for easy pasting into Pokemon GO
+**Include vs. Exclude:**
+- Green ➕ button = Include (must have this)
+- Red ➖ button = Exclude (must NOT have this)
 
-## 🚀 Why Use This Tool?
+**Example Searches:**
+- `shiny&legendary` - All shiny legendaries
+- `4*&!shadow` - Perfect Pokemon that aren't shadow
+- `age0-7&evolve` - Pokemon caught this week that can evolve
+- `shadow&3*,4*` - High IV shadows (3 or 4 stars)
 
-Pokemon GO's search syntax is powerful but hard to remember. Instead of typing `4*&shiny&!shadow&year2016-2020`, just click the filters you want and copy the generated string.
+### Quick Picks
 
-Perfect for:
+**Generations:**
+- Click any generation to add all Pokemon from that region
+- Example: "Gen 1 (Kanto)" adds Pokemon #1-151
 
-- Finding Pokemon for lucky trades
+**Pokemon Groups:**
+- All Starters, Eeveelutions, Pseudo-Legendaries
+- Organized by region (Kanto Starters, Johto Starters, etc.)
 
-- IV hunting and appraisal filtering
+### Premade Searches
 
-- Move-based searches for raids/PvP
+**PvP Meta:**
+- S-Tier, A+ Tier, A-Tier shadows and non-shadows
+- Top 25 Master League Pokemon
 
-- Storage management and organization
+**Quick Combos:**
+- Shiny Legendaries
+- Perfect Shadows (4★ shadow)
+- High IV Non-Shiny
+- Trade Fodder
+- Recent Catches
+- Evolution Ready
+- And more!
 
-- Event Pokemon with special backgrounds
+### Language Support
 
-## 📱 How to Use
+**Change Language:**
+1. Click globe icon (🌐) in top right
+2. Select your language
+3. All search strings automatically translate
 
-1. Visit [https://its-snooze.github.io/pogosearch](https://its-snooze.github.io/pogosearch)
+**Note:** Translation feature is in beta (WIP marker shown). Report issues in Discord!
 
-2. Click through categories to find filters
+---
 
-3. Use **+** to include or **-** to exclude filters
+## 🎓 Search String Syntax Guide
 
-4. Copy the generated search string
+### Operators
+- `,` (comma) = **OR** - Example: `fire,water` finds Fire OR Water
+- `&` (ampersand) = **AND** - Example: `fire&flying` finds Fire AND Flying
+- `!` (exclamation) = **NOT** - Example: `!shiny` excludes shinies
 
-5. Paste into Pokemon GO's search bar
+### Common Patterns
+- **Pokedex Numbers** - Use commas: `150,151,152`
+- **Ranges** - Use hyphens: `cp1500-2500`, `year2016-2020`
+- **Star Ratings** - `4*` (perfect), `3*` (82-98%), etc.
+- **IVs** - `4attack` (15 atk), `0attack` (0 atk)
+- **Age** - `age0` (today), `age0-7` (last week)
+- **Moves** - `@special` (legacy), `@1fire` (fire fast move)
+
+### Validation
+The app automatically checks for:
+- ❌ Spaces (not allowed)
+- ❌ Missing ampersands between numbers and text
+- ❌ Using `&` between Pokedex numbers (should be `,`)
+- ✅ Suggests corrections
+
+---
 
 ## 🛠️ Development
 
-### Prerequisites
+### Tech Stack
+- **React** - UI framework
+- **Lucide React** - Icons
+- **Tailwind CSS** - Styling
+- **GitHub Pages** - Hosting
 
-- Node.js (v14 or higher)
-
-- npm or yarn
-
-### Local Setup
+### Local Development
 
 ```bash
-# Clone the repository
+# Clone the repo
 git clone https://github.com/its-snooze/pogosearch.git
-
-# Navigate to directory
 cd pogosearch
 
 # Install dependencies
 npm install
 
-# Run locally
+# Start dev server
 npm start
 
 # Build for production
@@ -100,110 +177,96 @@ npm run build
 npm run deploy
 ```
 
-## 🎯 Filter Categories
-
-1. **Stats & IVs** - Star ratings, attack/defense/HP filters
-
-2. **Types** - All 18 Pokemon types
-
-3. **Special Status** - Shiny, lucky, shadow, purified, legendary, mythical, regional forms
-
-4. **Evolution & Buddy** - Evolution status, mega evolution, buddy levels
-
-5. **Time & Distance** - Age filters, year filters, distance from location
-
-6. **Size & Gender** - XXS, XXL, male, female filters
-
-7. **Moves** - Move types with slot-specific filtering
-
-8. **Regions** - Kanto through Paldea
-
-## 🤝 Contributing
-
-Contributions are welcome! This is an open-source community project.
-
-### How to Contribute
-
-1. Fork the repository
-
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-
-5. Open a Pull Request
-
-### Ideas for Contributions
-
-- Add missing filters
-
-- Improve UI/UX
-
-- Fix bugs
-
-- Add premade search templates
-
-- Improve mobile experience
-
-- Add tests
-
-## 📝 Roadmap
-
-Potential future features:
-
-- [ ] Premade search templates (PvP IVs, Quick Transfer, Lucky Candidates)
-
-- [ ] CP/HP range inputs
-
-- [ ] Distance filter input
-
-- [ ] Pokedex number search
-
-- [ ] Search history
-
-- [ ] Export/Import saved searches
-
-- [ ] Tooltips explaining each filter
-
-Have an idea? [Open an issue](https://github.com/its-snooze/pogosearch/issues)!
-
-## 🐛 Bug Reports
-
-Found a bug? Please [open an issue](https://github.com/its-snooze/pogosearch/issues) with:
-
-- Description of the bug
-
-- Steps to reproduce
-
-- Expected vs actual behavior
-
-- Screenshots (if applicable)
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 💖 Support
-
-If you find this tool useful, consider supporting its development:
-
-[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K0ZNM6K)
-
-## 🙏 Acknowledgments
-
-- Built for the Pokemon GO community
-
-- Filter syntax based on official Niantic documentation
-
-- Inspired by the need for easier Pokemon management
-
-## 📧 Contact
-
-- GitHub: [@its-snooze](https://github.com/its-snooze)
-
-- Issues: [GitHub Issues](https://github.com/its-snooze/pogosearch/issues)
+### Project Structure
+```
+src/
+├── components/          # React components
+│   └── CustomAgeInput.js
+├── translations/        # Translation files
+│   ├── translations.js  # Pokemon GO terms (15 languages)
+│   ├── uiTranslations.js
+│   └── extras.js        # Overlaps, warnings, locales
+├── utils/              # Helper functions
+│   └── translation.js  # Translation utilities
+└── App.js              # Main app component
+```
 
 ---
 
-**Made with ❤️ for Pokemon GO trainers worldwide** 🎮
+## 🤝 Contributing
+
+We welcome contributions! Here's how to help:
+
+### Report Bugs
+1. Join our **[Discord](https://discord.gg/X9zqC3quKR)**
+2. Post in **#bug-reports** with:
+   - What you tried to do
+   - What happened
+   - Screenshots if possible
+
+### Suggest Features
+1. Check the **[Roadmap](ROADMAP.md)** first
+2. Post in Discord **#feature-requests**
+3. Explain your use case and why it'd be useful
+
+### Submit Code
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Make your changes
+4. Test thoroughly
+5. Commit (`git commit -m 'Add amazing feature'`)
+6. Push to branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
+
+### Add Premade Searches
+Have a useful search combination? We'd love to add it!
+1. Test it in Pokemon GO
+2. Share in Discord **#tips-and-tricks**
+3. If popular, we'll add it to the app
+
+---
+
+## 🙏 Credits
+
+### Translations
+- **Translation data** from [Leidwesen's PhraseTranslator](https://github.com/Leidwesen/PhraseTranslator)
+- Covers all Pokemon GO search terms in 15 languages
+
+### PvP Tier Lists
+- Based on **PokeMiners**, **LeekDuck**, and **GamePress** data
+- Updated regularly to reflect current meta
+
+### Community
+- Shoutout to everyone on **r/TheSilphRoad** and **r/PokemonGO**
+- All the Discord members testing and giving feedback!
+
+---
+
+## 📄 License
+
+This project is licensed under the MIT License - see [LICENSE](LICENSE) file for details.
+
+---
+
+## 🔗 Links
+
+- **Live App**: https://its-snooze.github.io/pogosearch
+- **Discord**: https://discord.gg/X9zqC3quKR
+- **GitHub**: https://github.com/its-snooze/pogosearch
+- **Roadmap**: [ROADMAP.md](ROADMAP.md)
+
+---
+
+## 💖 Support
+
+This tool is **100% free** and **open source**. If you find it useful:
+- ⭐ Star the repo
+- 🔄 Share with your Pokemon GO friends
+- 💬 Join the Discord community
+- 🐛 Report bugs and suggest features
+
+---
+
+**Built with ❤️ by the Pokemon GO community**
+
+*Not affiliated with Niantic or The Pokemon Company*
