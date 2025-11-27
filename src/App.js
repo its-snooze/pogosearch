@@ -2,9 +2,10 @@ import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react'
 import { 
   Search, Copy, X, ChevronDown, AlertTriangle, Check, 
   BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus,
-  Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon, Globe
+  Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon, Globe, MessageCircle
 } from 'lucide-react';
 import { translateSearchString, translateTerm, translateToEnglish, getAvailableLanguages, getLocale } from './utils/translation';
+import { getUIText } from './translations/uiTranslations';
 
 // Validation function for Pokemon GO search strings
 function validateSearchString(str) {
@@ -16,7 +17,7 @@ function validateSearchString(str) {
   if (str.includes(' ')) {
     return { 
       valid: false, 
-      error: "Remove spaces from search string" 
+      errorKey: 'remove_spaces'
     };
   }
   
@@ -29,7 +30,7 @@ function validateSearchString(str) {
   if (missingAmpersandPattern.test(str)) {
     return { 
       valid: false, 
-      error: "Missing & between filters" 
+      errorKey: 'missing_ampersand'
     };
   }
   
@@ -42,7 +43,7 @@ function validateSearchString(str) {
     // Single digit + letter might be a valid filter (e.g., "3attack"), so we allow those
     return { 
       valid: false, 
-      error: "Missing & between filters" 
+      errorKey: 'missing_ampersand'
     };
   }
   
@@ -58,7 +59,7 @@ function validateSearchString(str) {
     if (/^[\d,]+$/.test(currentPart) && /^[\d,]+$/.test(nextPart)) {
       return { 
         valid: false, 
-        error: "Use commas between Pokedex numbers, not &" 
+        errorKey: 'use_commas'
       };
     }
   }
@@ -66,52 +67,52 @@ function validateSearchString(str) {
   return { valid: true };
 }
 
-// Category metadata with colors and icons
+// Category metadata with colors and icons - names will be translated in component
 const categoryMeta = {
   stats: { 
-    name: 'Stats & IVs', 
+    nameKey: 'stats_ivs',
     icon: BarChart3, 
     gradient: 'from-blue-500 to-cyan-500',
     chipColor: 'bg-blue-500'
   },
   types: { 
-    name: 'Types', 
+    nameKey: 'types',
     icon: Zap, 
     gradient: 'from-green-500 to-emerald-500',
     chipColor: 'bg-green-500'
   },
   special: { 
-    name: 'Special Status', 
+    nameKey: 'special_status',
     icon: Sparkles, 
     gradient: 'from-purple-500 to-pink-500',
     chipColor: 'bg-purple-500'
   },
   evolution: { 
-    name: 'Evolution & Buddy', 
+    nameKey: 'evolution_buddy',
     icon: TrendingUp, 
     gradient: 'from-orange-500 to-red-500',
     chipColor: 'bg-orange-500'
   },
   time: { 
-    name: 'Time & Distance', 
+    nameKey: 'time_distance',
     icon: Clock, 
     gradient: 'from-teal-500 to-cyan-500',
     chipColor: 'bg-teal-500'
   },
   size: { 
-    name: 'Size & Gender', 
+    nameKey: 'size_gender',
     icon: Ruler, 
     gradient: 'from-pink-500 to-rose-500',
     chipColor: 'bg-pink-500'
   },
   moves: { 
-    name: 'Moves', 
+    nameKey: 'moves',
     icon: Swords, 
     gradient: 'from-red-500 to-orange-500',
     chipColor: 'bg-red-500'
   },
   regions: { 
-    name: 'Regions', 
+    nameKey: 'regions',
     icon: Globe, 
     gradient: 'from-indigo-500 to-violet-500',
     chipColor: 'bg-indigo-500'
@@ -121,7 +122,7 @@ const categoryMeta = {
 // Filter definitions organized by category
 const filterCategories = {
   stats: {
-    name: 'Stats & IVs',
+    nameKey: 'stats_ivs',
     filters: [
       { id: '4*', label: '4★ (100% IV)', value: '4*' },
       { id: '3*', label: '3★ (82-98% IV)', value: '3*' },
@@ -140,7 +141,7 @@ const filterCategories = {
     ]
   },
   types: {
-    name: 'Types',
+    nameKey: 'types',
     filters: [
       { id: 'normal', label: 'Normal', value: 'normal' },
       { id: 'fire', label: 'Fire', value: 'fire' },
@@ -163,7 +164,7 @@ const filterCategories = {
     ]
   },
   special: {
-    name: 'Special Status',
+    nameKey: 'special_status',
     filters: [
       { id: 'shiny', label: 'Shiny', value: 'shiny' },
       { id: 'lucky', label: 'Lucky', value: 'lucky' },
@@ -190,7 +191,7 @@ const filterCategories = {
     ]
   },
   evolution: {
-    name: 'Evolution & Buddy',
+    nameKey: 'evolution_buddy',
     filters: [
       { id: 'evolve', label: 'Can Evolve', value: 'evolve' },
       { id: 'megaevolve', label: 'Can Mega Evolve', value: 'megaevolve' },
@@ -210,7 +211,7 @@ const filterCategories = {
     ]
   },
   time: {
-    name: 'Time & Distance',
+    nameKey: 'time_distance',
     filters: [
       { id: 'age0', label: 'Caught Today', value: 'age0' },
       { id: 'age0-7', label: 'Last 7 Days', value: 'age0-7' },
@@ -229,7 +230,7 @@ const filterCategories = {
     ]
   },
   size: {
-    name: 'Size & Gender',
+    nameKey: 'size_gender',
     filters: [
       { id: 'xxs', label: 'XXS', value: 'xxs' },
       { id: 'xs', label: 'XS', value: 'xs' },
@@ -241,7 +242,7 @@ const filterCategories = {
     ]
   },
   moves: {
-    name: 'Moves',
+    nameKey: 'moves',
     filters: [
       { id: '@special', label: 'Legacy/Special Moves', value: '@special' },
       // Fast Move Filters (Slot 1)
@@ -305,7 +306,7 @@ const filterCategories = {
     ]
   },
   regions: {
-    name: 'Regions',
+    nameKey: 'regions',
     filters: [
       { id: 'kanto', label: 'Kanto (Gen 1)', value: 'kanto' },
       { id: 'johto', label: 'Johto (Gen 2)', value: 'johto' },
@@ -367,6 +368,10 @@ const PokemonGoSearchBuilder = () => {
     return stored || 'English';
   });
   const [translationWarnings, setTranslationWarnings] = useState([]);
+  const [discordDismissed, setDiscordDismissed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('pogoDiscordDismissed') === 'true';
+  });
   const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
@@ -789,6 +794,11 @@ const PokemonGoSearchBuilder = () => {
     localStorage.setItem('pogoLanguage', selectedLanguage);
   }, [selectedLanguage]);
 
+  // Save Discord dismissed state to localStorage
+  React.useEffect(() => {
+    localStorage.setItem('pogoDiscordDismissed', discordDismissed.toString());
+  }, [discordDismissed]);
+
   // Helper function to translate and set search string (for manual insertions)
   const setTranslatedSearchString = useCallback((englishString) => {
     if (!englishString) {
@@ -832,13 +842,22 @@ const PokemonGoSearchBuilder = () => {
   // Validate search string whenever it changes
   React.useEffect(() => {
     const validation = validateSearchString(searchString);
-    setValidationResult(validation);
+    // Translate error message if there's an errorKey
+    if (!validation.valid && validation.errorKey) {
+      setValidationResult({
+        valid: false,
+        error: getUIText(validation.errorKey, selectedLanguage)
+      });
+    } else {
+      setValidationResult(validation);
+    }
     
     // Console warning during development
     if (!validation.valid && process.env.NODE_ENV === 'development') {
-      console.warn(`Invalid search string: "${searchString}" - ${validation.error}`);
+      const errorMsg = validation.errorKey ? getUIText(validation.errorKey, selectedLanguage) : validation.error;
+      console.warn(`Invalid search string: "${searchString}" - ${errorMsg}`);
     }
-  }, [searchString]);
+  }, [searchString, selectedLanguage]);
 
   const toggleIncludeFilter = (filterId) => {
     setIsPremadeSearch(false);
@@ -1494,6 +1513,34 @@ const PokemonGoSearchBuilder = () => {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-cyan-50/50 text-slate-900 dark:from-slate-950 dark:via-slate-950 dark:to-slate-900 dark:text-slate-100 transition-colors duration-300">
       <CopyToast />
       
+      {/* Discord Invite Banner */}
+      {!discordDismissed && (
+        <div className="bg-gradient-to-r from-indigo-600/90 to-purple-600/90 backdrop-blur-sm border-b border-indigo-500/30 dark:from-indigo-900/80 dark:to-purple-900/80 dark:border-indigo-700/50">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-3">
+            <div className="flex items-center justify-between gap-3">
+              <a
+                href={getUIText('discord_link', selectedLanguage)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-white hover:text-indigo-100 transition-colors flex-1 min-w-0"
+              >
+                <MessageCircle className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0" />
+                <span className="text-xs sm:text-sm font-medium truncate">
+                  {getUIText('join_discord', selectedLanguage)}
+                </span>
+              </a>
+              <button
+                onClick={() => setDiscordDismissed(true)}
+                className="text-white/80 hover:text-white transition-colors p-1 flex-shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Sticky Header with Output Section */}
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
@@ -1501,10 +1548,10 @@ const PokemonGoSearchBuilder = () => {
           <div className="mb-4 flex items-center justify-between gap-4">
             <div>
               <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0077BE] to-[#00A7E5] bg-clip-text text-transparent">
-                Pokémon GO Search Builder
+                {getUIText('app_title', selectedLanguage)}
               </h1>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
-                Build search strings visually
+                {getUIText('app_subtitle', selectedLanguage)}
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -1519,7 +1566,10 @@ const PokemonGoSearchBuilder = () => {
                     <option key={lang} value={lang}>{lang}</option>
                   ))}
                 </select>
-                <Globe className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none text-[#0077BE] dark:text-slate-100" />
+                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+                  <Globe className="w-4 h-4 text-[#0077BE] dark:text-slate-100" />
+                  <span className="text-[10px] opacity-70 text-[#0077BE] dark:text-slate-100">{getUIText('language_wip', selectedLanguage)}</span>
+                </div>
               </div>
               <button
                 onClick={() => setIsDarkMode(prev => !prev)}
@@ -1532,7 +1582,7 @@ const PokemonGoSearchBuilder = () => {
                   <Moon className="w-4 h-4" />
                 )}
                 <span className="hidden sm:inline">
-                  {isDarkMode ? 'Light mode' : 'Dark mode'}
+                  {isDarkMode ? getUIText('light_mode', selectedLanguage) : getUIText('dark_mode', selectedLanguage)}
                 </span>
               </button>
             </div>
@@ -1543,11 +1593,11 @@ const PokemonGoSearchBuilder = () => {
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-bold text-gray-700 dark:text-slate-200">
-                  Search String
+                  {getUIText('search_string', selectedLanguage)}
                 </label>
                 {(includedFilters.length > 0 || excludedFilters.length > 0) && (
                   <span className="px-2 py-0.5 bg-[#0077BE] text-white text-xs font-bold rounded-full">
-                    {includedFilters.length + excludedFilters.length} active
+                    {includedFilters.length + excludedFilters.length} {getUIText('active', selectedLanguage)}
                   </span>
                 )}
                 {!validationResult.valid && (
@@ -1571,7 +1621,7 @@ const PokemonGoSearchBuilder = () => {
                     <AlertTriangle className="w-4 h-4 text-yellow-500 cursor-help" />
                     <div className="absolute left-0 top-full mt-2 z-50 w-80 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/80 border-2 border-yellow-400 dark:border-yellow-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200">
                       <p className="text-xs font-semibold text-yellow-800 dark:text-yellow-200 mb-1">
-                        Translation Warnings:
+                        {getUIText('translation_warnings', selectedLanguage)}
                       </p>
                       <ul className="text-xs text-yellow-700 dark:text-yellow-300 space-y-1 list-disc list-inside">
                         {translationWarnings.map((warning, idx) => (
@@ -1587,7 +1637,7 @@ const PokemonGoSearchBuilder = () => {
                   onClick={clearAll}
                   className="text-xs font-semibold text-gray-500 hover:text-red-500 transition-colors px-2 py-1 dark:text-slate-400 dark:hover:text-red-300"
                 >
-                  Clear All
+                  {getUIText('clear_all', selectedLanguage)}
                 </button>
               </div>
             </div>
@@ -1598,7 +1648,7 @@ const PokemonGoSearchBuilder = () => {
                   type="text"
                   value={searchString}
                   readOnly
-                  placeholder="Your search string will appear here..."
+                  placeholder={getUIText('search_placeholder', selectedLanguage)}
                   className={`w-full min-h-[48px] sm:min-h-[56px] px-4 py-3 border-2 rounded-xl focus:outline-none font-mono text-sm sm:text-base transition-all duration-200 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 cursor-default ${
                     !validationResult.valid 
                       ? 'border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 bg-amber-50/50 dark:bg-amber-950/30 dark:border-amber-500 dark:focus:ring-amber-500/40'
@@ -1622,12 +1672,12 @@ const PokemonGoSearchBuilder = () => {
                 {copySuccess ? (
                   <>
                     <Check className="w-5 h-5" />
-                    <span>Copied!</span>
-                  </>
+                    <span>{getUIText('copied', selectedLanguage)}</span>
+                  </> 
                 ) : (
                   <>
                     <Copy className="w-5 h-5" />
-                    <span className="hidden sm:inline">Copy</span>
+                    <span className="hidden sm:inline">{getUIText('copy', selectedLanguage)}</span>
                   </>
                 )}
               </button>
@@ -1641,12 +1691,12 @@ const PokemonGoSearchBuilder = () => {
                   className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95 touch-manipulation"
                 >
                   <Bookmark className="w-4 h-4" />
-                  <span>Save this search</span>
+                  <span>{getUIText('save_this_search', selectedLanguage)}</span>
                 </button>
                 {saveSuccessVisible && (
                   <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm animate-save-success">
                     <BookmarkCheck className="w-5 h-5" />
-                    <span>Search saved!</span>
+                    <span>{getUIText('search_saved', selectedLanguage)}</span>
                   </div>
                 )}
               </div>
@@ -1657,7 +1707,7 @@ const PokemonGoSearchBuilder = () => {
               <div className="mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg flex items-start gap-2 animate-pulse-warning dark:bg-amber-950/30 dark:border-amber-500">
                 <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-bold text-amber-800 text-sm mb-1 dark:text-amber-200">⚠️ Conflicting Filters</p>
+                  <p className="font-bold text-amber-800 text-sm mb-1 dark:text-amber-200">⚠️ {getUIText('conflicting_filters', selectedLanguage)}</p>
                   {conflicts.map((conflict, idx) => (
                     <p key={idx} className="text-xs text-amber-700 dark:text-amber-100">{conflict}</p>
                   ))}
@@ -1730,7 +1780,7 @@ const PokemonGoSearchBuilder = () => {
                   onClick={() => setShowSavedSearches(!showSavedSearches)}
                   className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 >
-                  <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">Saved Searches</h3>
+                  <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">{getUIText('saved_searches', selectedLanguage)}</h3>
                   <ChevronDown 
                     className={`w-5 h-5 transition-transform duration-300 ${showSavedSearches ? 'rotate-180' : ''}`}
                   />
@@ -1810,7 +1860,7 @@ const PokemonGoSearchBuilder = () => {
                 onClick={() => setShowQuickSearches(!showQuickSearches)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">Quick Searches</h3>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">{getUIText('quick_searches', selectedLanguage)}</h3>
                 <ChevronDown 
                   className={`w-5 h-5 transition-transform duration-300 ${showQuickSearches ? 'rotate-180' : ''}`}
                 />
@@ -2075,7 +2125,7 @@ const PokemonGoSearchBuilder = () => {
                 onClick={() => setShowCPRanges(!showCPRanges)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">CP Ranges</h3>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">{getUIText('cp_ranges', selectedLanguage)}</h3>
                 <ChevronDown 
                   className={`w-5 h-5 transition-transform duration-300 ${showCPRanges ? 'rotate-180' : ''}`}
                 />
@@ -2154,7 +2204,7 @@ const PokemonGoSearchBuilder = () => {
                 onClick={() => setShowPokemonSelection(!showPokemonSelection)}
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
               >
-                <h3 className="text-base sm:text-lg font-bold text-gray-800">Pokemon Selection</h3>
+                <h3 className="text-base sm:text-lg font-bold text-gray-800">{getUIText('pokemon_selection', selectedLanguage)}</h3>
                 <ChevronDown 
                   className={`w-5 h-5 transition-transform duration-300 ${showPokemonSelection ? 'rotate-180' : ''}`}
                 />
@@ -2213,7 +2263,7 @@ const PokemonGoSearchBuilder = () => {
               type="text"
               value={filterSearch}
               onChange={(e) => setFilterSearch(e.target.value)}
-              placeholder="Search filters... (e.g., 'shiny', 'attack', 'mega')"
+              placeholder={getUIText('filter_search_placeholder', selectedLanguage)}
               className="w-full pl-12 pr-12 py-3 border-2 border-blue-200 rounded-xl focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 focus:outline-none text-sm sm:text-base transition-all duration-200 bg-white text-slate-900 dark:text-slate-100 dark:bg-slate-900 dark:border-slate-700 dark:focus:border-cyan-400 dark:focus:ring-cyan-500/40 placeholder:text-slate-400 dark:placeholder:text-slate-500"
             />
             {filterSearch && (
@@ -2249,7 +2299,7 @@ const PokemonGoSearchBuilder = () => {
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
                     <div className="flex items-center gap-2 flex-1 min-w-0">
                       <span className="font-bold text-sm sm:text-base truncate">
-                        {category.name}
+                        {getUIText(category.nameKey, selectedLanguage)}
                       </span>
                       <span className="text-xs sm:text-sm opacity-90">
                         ({category.filters.length})
