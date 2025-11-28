@@ -288,7 +288,12 @@ const PokemonGoSearchBuilder = () => {
   const [toastPosition, setToastPosition] = useState({ x: 0, y: 0 });
   const [toastKey, setToastKey] = useState(0);
   const toastTimeoutRef = useRef(null);
-  const [validationResult, setValidationResult] = useState({ valid: true });
+  const [validationResult, setValidationResult] = useState({ 
+    valid: true, 
+    hasWarnings: false,
+    errors: [], 
+    warnings: [] 
+  });
   const [showValidationTooltip, setShowValidationTooltip] = useState(false);
   const [savedSearches, setSavedSearches] = useState([]);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -509,25 +514,24 @@ const PokemonGoSearchBuilder = () => {
   // - , (OR) = Can have ANY condition
   // - ! (NOT) = Exclude condition
   // - Operator precedence: NOT > AND > OR (commas distribute over &)
-  const buildSearchString = useCallback((selectedFilterOperators, customAge, customAgeOp, lang = 'English') => {
+  const buildSearchString = useCallback((filterOps, customAge, customAgeOp, lang = 'English') => {
     try {
-      // Group filters by their operator
+      // Group filters by operator type
       const andFilters = [];
       const orFilters = [];
       const notFilters = [];
 
-      Object.entries(selectedFilterOperators).forEach(([filterId, operator]) => {
+      // Process each filter with its operator
+      Object.entries(filterOps).forEach(([filterId, operator]) => {
         const filter = getFilterObject(filterId);
         if (!filter?.value) return;
 
-        const value = filter.value;
-
         if (operator === 'AND') {
-          andFilters.push(value);
+          andFilters.push(filter.value);
         } else if (operator === 'OR') {
-          orFilters.push(value);
+          orFilters.push(filter.value);
         } else if (operator === 'NOT') {
-          notFilters.push(`!${value}`);
+          notFilters.push(filter.value);
         }
       });
 
@@ -539,57 +543,56 @@ const PokemonGoSearchBuilder = () => {
         } else if (customAgeOp === 'OR') {
           orFilters.push(ageValue);
         } else if (customAgeOp === 'NOT') {
-          notFilters.push(`!${ageValue}`);
+          notFilters.push(ageValue);
         }
       }
 
-      // Get Pokedex numbers from ref (preserved from manual input)
+      // Get Pokedex numbers from ref
       const pokedexNumbers = pokedexNumbersRef.current;
 
-      // Build the search string following Pokemon GO precedence
-      // Structure: pokedex&andFilters&orFilters&notFilters
-      // where orFilters are joined with commas
+      // Build search string following Pokemon GO syntax
+      // Structure: [pokedex]&[AND filters]&[OR filters]&[NOT filters]
 
       const parts = [];
 
-      // 1. Pokedex numbers first (if any)
-      if (pokedexNumbers) {
-        parts.push(pokedexNumbers);
+      // 1. Pokedex numbers (if any)
+      if (pokedexNumbers && pokedexNumbers.trim()) {
+        parts.push(pokedexNumbers.trim());
       }
 
-      // 2. AND filters (join with &)
+      // 2. AND filters - join with & between them
+      // CRITICAL: Each AND filter must be separated by &
       if (andFilters.length > 0) {
+        // Join all AND filters with &
         parts.push(andFilters.join('&'));
       }
 
-      // 3. OR filters (join with ,)
+      // 3. OR filters - join with , between them  
+      // CRITICAL: Each OR filter must be separated by ,
       if (orFilters.length > 0) {
+        // If there are both AND and OR filters, wrap OR in proper grouping
+        // Example: fire&shiny,legendary becomes fire&(shiny,legendary)
+        // But Pokemon GO doesn't support parentheses, so we rely on operator precedence
+        // Comma has lower precedence, so fire&shiny,legendary = (fire&shiny),(fire&legendary)
         parts.push(orFilters.join(','));
       }
 
-      // 4. NOT filters (join with &)
+      // 4. NOT filters - each gets ! prefix, join with &
+      // CRITICAL: NOT filters are joined with & (multiple exclusions)
       if (notFilters.length > 0) {
-        parts.push(notFilters.join('&'));
+        const notPart = notFilters.map(v => `!${v}`).join('&');
+        parts.push(notPart);
       }
 
       // Join all parts with &
-      let result = parts.filter(p => p).join('&');
+      // CRITICAL: Use & to separate different sections
+      let result = parts.filter(p => p && p.trim()).join('&');
 
-      // Validate the result
-      const validation = validateSearchString(result);
-      if (!validation.valid) {
-        const errorMessages = validation.errors && validation.errors.length > 0
-          ? validation.errors.map(err => err.message || err)
-          : ['Invalid search string'];
-        setValidationResult({
-          valid: false,
-          error: errorMessages.length === 1 ? errorMessages[0] : errorMessages.join('; ')
-        });
-      } else {
-        setValidationResult({ valid: true });
-      }
+      // Validate
+      const validation = validateFilterOperators(filterOps);
+      setValidationResult(validation);
 
-      // Translate if not English
+      // Translate if needed
       if (lang !== 'English' && result) {
         const translationResult = translateSearchString(result, lang, true);
         setTranslationWarnings(translationResult.warnings || []);
@@ -598,15 +601,226 @@ const PokemonGoSearchBuilder = () => {
 
       setTranslationWarnings([]);
       return result;
+
     } catch (error) {
       console.error('Error building search string:', error);
-      setValidationResult({
+      setValidationResult({ 
         valid: false,
-        error: 'Error building search string'
+        hasWarnings: false,
+        errors: [{ 
+          issue: 'Error building search string',
+          why: error.message,
+          fix: 'Please try again or report this bug.'
+        }],
+        warnings: []
       });
       return '';
     }
-  }, [getFilterObject]);
+  }, [getFilterObject, validateFilterOperators]);
+
+  // Validate filter operators based on Pokemon GO search logic
+  const validateFilterOperators = useCallback((filterOps) => {
+    const errors = [];
+    const warnings = [];
+
+    // Group by operator type
+    const andFilters = Object.entries(filterOps).filter(([_, op]) => op === 'AND').map(([id]) => id);
+    const orFilters = Object.entries(filterOps).filter(([_, op]) => op === 'OR').map(([id]) => id);
+    const notFilters = Object.entries(filterOps).filter(([_, op]) => op === 'NOT').map(([id]) => id);
+
+    // RULE 1: Same stat with different values using AND (IMPOSSIBLE)
+    const checkStatConflict = (stats, statName) => {
+      const andStats = andFilters.filter(id => stats.includes(id));
+      if (andStats.length > 1) {
+        const statValues = andStats.map(id => {
+          if (id.startsWith('4')) return '15 (perfect)';
+          if (id.startsWith('3')) return '12-14 (high)';
+          if (id.startsWith('0')) return '0 (zero)';
+          return '';
+        }).filter(Boolean);
+        errors.push({
+          issue: `Cannot use AND with multiple ${statName} IVs (${andStats.join(' & ')})`,
+          why: `A Pokémon can only have ONE ${statName} IV value. You're asking for ${statName} to be ${statValues.join(' AND ')} at the same time.`,
+          fix: `Change to OR: ${andStats.join(',')} - this will show Pokémon with ANY of these ${statName} values.`
+        });
+      }
+    };
+
+    checkStatConflict(['4attack', '3attack', '0attack'], 'Attack');
+    checkStatConflict(['4defense', '3defense', '0defense'], 'Defense');
+    checkStatConflict(['4hp', '3hp', '0hp'], 'HP');
+
+    // RULE 2: Multiple star ratings with AND (IMPOSSIBLE)
+    const starRatings = ['4*', '3*', '2*', '1*', '0*'];
+    const andStars = andFilters.filter(id => starRatings.includes(id));
+    if (andStars.length > 1) {
+      errors.push({
+        issue: `Cannot use AND with multiple star ratings (${andStars.join(' & ')})`,
+        why: `A Pokémon has ONE star rating based on total IVs. It cannot be ${andStars.join(' AND ')} simultaneously.`,
+        fix: `Change to OR: ${andStars.join(',')} - this will show Pokémon with ANY of these star ratings.`
+      });
+    }
+
+    // RULE 3: 4★ conflicts with non-perfect IVs (IMPOSSIBLE)
+    if (andFilters.includes('4*')) {
+      const conflictingIVs = ['3attack', '0attack', '3defense', '0defense', '3hp', '0hp'];
+      const conflicts = andFilters.filter(id => conflictingIVs.includes(id));
+      if (conflicts.length > 0) {
+        errors.push({
+          issue: `4★ with non-perfect IVs (${conflicts.join(', ')})`,
+          why: `4★ means 15/15/15 (all perfect). Cannot have ${conflicts.map(c => c.includes('3') ? '12-14' : '0').join(' or ')} when requiring perfect stats.`,
+          fix: `Remove 4★, or remove ${conflicts.join(', ')}, or change 4★ to OR if you want either perfect OR non-perfect.`
+        });
+      }
+    }
+
+    // RULE 4: Perfect stats combination excluding 4★ (IMPOSSIBLE)
+    const hasPerfectAttack = andFilters.includes('4attack');
+    const hasPerfectDefense = andFilters.includes('4defense');
+    const hasPerfectHP = andFilters.includes('4hp');
+    const excludes4Star = notFilters.includes('4*');
+
+    if (hasPerfectAttack && hasPerfectDefense && hasPerfectHP && excludes4Star) {
+      errors.push({
+        issue: `Requiring perfect Attack, Defense, and HP but excluding 4★`,
+        why: `15/15/15 IS a 4★ (perfect) Pokémon. You cannot have all perfect stats and NOT be 4★.`,
+        fix: `Remove NOT 4★, or remove one of the perfect stat requirements.`
+      });
+    }
+
+    // RULE 5: 0★ with high IVs (IMPOSSIBLE)
+    if (andFilters.includes('0*')) {
+      const highIVs = ['4attack', '3attack', '4defense', '3defense', '4hp', '3hp'];
+      const conflicts = andFilters.filter(id => highIVs.includes(id));
+      if (conflicts.length > 0) {
+        errors.push({
+          issue: `0★ with high IVs (${conflicts.join(', ')})`,
+          why: `0★ means 0-49% total IVs (0-22 stat points). High IVs like ${conflicts.join(', ')} would push it above 0★.`,
+          fix: `Change 0★ to a higher star rating, or remove the high IV filters, or use OR instead of AND.`
+        });
+      }
+    }
+
+    // RULE 6: Shadow AND Purified (IMPOSSIBLE)
+    if (andFilters.includes('shadow') && andFilters.includes('purified')) {
+      errors.push({
+        issue: `Shadow AND Purified`,
+        why: `A Pokémon cannot be both Shadow AND Purified. Once purified, it's no longer shadow.`,
+        fix: `Change to OR: shadow,purified - this will show Pokémon that are EITHER shadow OR purified.`
+      });
+    }
+
+    // RULE 7: Excluding all star ratings (USELESS but not invalid)
+    const notStars = notFilters.filter(id => starRatings.includes(id));
+    if (notStars.length === 5) {
+      warnings.push({
+        issue: `Excluding ALL star ratings (NOT 4★, 3★, 2★, 1★, 0★)`,
+        why: `This will return zero results since every Pokémon has a star rating.`,
+        suggestion: `Remove some of the NOT filters to allow some star ratings through.`
+      });
+    }
+
+    // RULE 8: Two perfect stats excluding 4★ (WORKS but narrow)
+    if (excludes4Star) {
+      const perfectStats = ['4attack', '4defense', '4hp'].filter(id => andFilters.includes(id));
+      if (perfectStats.length === 2) {
+        warnings.push({
+          issue: `Two perfect IVs (${perfectStats.join(', ')}) while excluding 4★`,
+          why: `This is valid but VERY specific. Only shows Pokémon with 2 perfect stats and the third stat at 0-14.`,
+          suggestion: `This is a narrow search - you might not find many results.`
+        });
+      }
+    }
+
+    // RULE 9: 3★ with multiple zero IVs (VERY UNLIKELY but technically possible)
+    if (andFilters.includes('3*')) {
+      const zeroIVs = ['0attack', '0defense', '0hp'].filter(id => andFilters.includes(id));
+      if (zeroIVs.length >= 2) {
+        errors.push({
+          issue: `3★ with ${zeroIVs.length} zero IVs (${zeroIVs.join(', ')})`,
+          why: `3★ requires 37-44 total stat points (82-98%). Having 2+ stats at 0 makes this mathematically impossible.`,
+          fix: `Remove 3★, or remove the zero IV filters, or change to 1★ or 0★.`
+        });
+      }
+    }
+
+    // RULE 10: 2★ with zero attack AND zero defense (UNLIKELY)
+    if (andFilters.includes('2*')) {
+      const hasZeroAttack = andFilters.includes('0attack');
+      const hasZeroDefense = andFilters.includes('0defense');
+      const hasZeroHP = andFilters.includes('0hp');
+      const zeroCount = [hasZeroAttack, hasZeroDefense, hasZeroHP].filter(Boolean).length;
+
+      if (zeroCount >= 2) {
+        errors.push({
+          issue: `2★ with 2+ zero IVs`,
+          why: `2★ requires 30-36 total stat points. With 2 stats at 0, you'd need the third at 30+ which is impossible (max is 15).`,
+          fix: `Remove 2★, or remove the zero IV filters, or change to 0★ or 1★.`
+        });
+      }
+    }
+
+    // RULE 11: Perfect IV with NOT perfect star (IMPOSSIBLE)
+    if (notFilters.includes('4*')) {
+      const hasPerfectAttack = andFilters.includes('4attack');
+      const hasPerfectDefense = andFilters.includes('4defense');
+      const hasPerfectHP = andFilters.includes('4hp');
+
+      // Already covered by RULE 4, but add warning for 1 or 2 perfect stats
+      const perfectCount = [hasPerfectAttack, hasPerfectDefense, hasPerfectHP].filter(Boolean).length;
+      if (perfectCount === 1) {
+        // This is fine, just informational
+      } else if (perfectCount === 2) {
+        // Already has warning from RULE 8
+      }
+    }
+
+    // RULE 12: Type conflicts (Valid but user might be confused)
+    // Pokemon GO allows "fire&water" even though no Pokemon is both types
+    // This is VALID syntax, just returns 0 results
+    // Don't add error, this is intentional sometimes
+
+    // RULE 13: Age/Time filters (always valid, skip)
+
+    // RULE 14: Mega/Shadow/Purified combinations (check special cases)
+    const hasMega = andFilters.includes('megaevolve') || 
+                     andFilters.includes('mega0') || 
+                     andFilters.includes('mega1') || 
+                     andFilters.includes('mega2') || 
+                     andFilters.includes('mega3');
+    const hasShadow = andFilters.includes('shadow');
+    if (hasMega && hasShadow) {
+      warnings.push({
+        issue: `Mega AND Shadow`,
+        why: `Currently, Shadow Pokémon cannot Mega Evolve in Pokémon GO.`,
+        suggestion: `This search will return zero results. Consider using OR instead if you want either.`
+      });
+    }
+
+    // RULE 15: Buddy level checks (always valid)
+    // buddy0-5 can be combined freely
+
+    // RULE 16: CP/HP ranges (handled externally, skip)
+
+    // RULE 17: Distance filters (always valid, skip)
+
+    // RULE 18: Check for VALID but UNUSUAL searches (don't error, just inform)
+    const orStars = orFilters.filter(id => starRatings.includes(id));
+    if (orStars.includes('4*') && orStars.includes('0*') && orStars.length === 2) {
+      warnings.push({
+        issue: `4★ OR 0★ search`,
+        why: `This is valid but unusual - shows only perfect AND very weak Pokémon.`,
+        suggestion: `This might be intentional for collecting extremes, just confirming it's what you want.`
+      });
+    }
+
+    return {
+      valid: errors.length === 0,
+      hasWarnings: warnings.length > 0,
+      errors,
+      warnings
+    };
+  }, []);
 
   // Save language preference to localStorage
   React.useEffect(() => {
@@ -664,21 +878,44 @@ const PokemonGoSearchBuilder = () => {
     }
   }, [filterOperators, customAgeValue, customAgeIncluded, customAgeExcluded, selectedLanguage, isPremadeSearch, buildSearchString]);
 
-  // Validate search string whenever it changes
+  // Run validation on filterOperators change
+  useEffect(() => {
+    const result = validateFilterOperators(filterOperators);
+    setValidationResult(result);
+  }, [filterOperators, validateFilterOperators]);
+
+  // Validate search string whenever it changes (for syntax errors)
+  // Note: This is separate from filterOperators validation which handles logic errors
+  // The filterOperators validation takes precedence for UI display
   React.useEffect(() => {
     const validation = validateSearchString(searchString);
     
-    // Convert parser errors to display format
-    if (!validation.valid && validation.errors && validation.errors.length > 0) {
-      // Get the first error message (or combine all if multiple)
-      const errorMessages = validation.errors.map(err => err.message || err);
-      setValidationResult({
-        valid: false,
-        error: errorMessages.length === 1 ? errorMessages[0] : errorMessages.join('; ')
-      });
-    } else {
-      setValidationResult({ valid: validation.valid });
-    }
+    // Only update validationResult if there are no filterOperators validation errors
+    // This prevents overriding the more comprehensive filterOperators validation
+    setValidationResult(prev => {
+      // If we already have filterOperators errors, keep them
+      if (!prev.valid && prev.errors && prev.errors.length > 0) {
+        return prev;
+      }
+      
+      // Otherwise, use search string validation results
+      if (!validation.valid && validation.errors && validation.errors.length > 0) {
+        const errorMessages = validation.errors.map(err => err.message || err);
+        return {
+          valid: false,
+          hasWarnings: false,
+          errors: errorMessages.map(msg => ({ issue: msg, why: msg, fix: 'Check the search string syntax.' })),
+          warnings: []
+        };
+      }
+      
+      return { 
+        valid: validation.valid,
+        hasWarnings: false,
+        errors: [],
+        warnings: []
+      };
+    });
     
     // Console warning during development
     if (!validation.valid && process.env.NODE_ENV === 'development') {
@@ -890,23 +1127,16 @@ const PokemonGoSearchBuilder = () => {
   }, [selectedLanguage, findFilterByValue, extractPokedexNumbers]);
 
   const copyToClipboard = async () => {
-    // Validate before copying
+    // Validate before copying (for console warnings only, UI validation is handled separately)
     const validation = validateSearchString(searchString);
     if (!validation.valid) {
       if (process.env.NODE_ENV === 'development') {
         const errorMsg = validation.errors && validation.errors.length > 0 
           ? validation.errors.map(e => e.message || e).join('; ')
           : 'Invalid search string';
-        console.warn(`Cannot copy invalid search string: "${searchString}" - ${errorMsg}`);
+        console.warn(`Copying search string with issues: "${searchString}" - ${errorMsg}`);
       }
-      // Still allow copying, but show validation error
-      const errorMessages = validation.errors && validation.errors.length > 0
-        ? validation.errors.map(err => err.message || err)
-        : ['Invalid search string'];
-      setValidationResult({
-        valid: false,
-        error: errorMessages.length === 1 ? errorMessages[0] : errorMessages.join('; ')
-      });
+      // Don't override filterOperators validation - allow copying even with errors
       return;
     }
     
@@ -1701,6 +1931,64 @@ const PokemonGoSearchBuilder = () => {
 
           {/* Output Section - FOCAL POINT */}
           <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50 dark:from-slate-900 dark:to-slate-900/70 dark:border-slate-700 dark:shadow-slate-900/40">
+            {/* Validation Errors - Red background, show WHY and HOW TO FIX */}
+            {!validationResult.valid && validationResult.errors && validationResult.errors.length > 0 && (
+              <div className="mb-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-500">
+                <div className="flex items-start gap-3 mb-3">
+                  <AlertTriangle size={24} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-bold text-base text-red-800 dark:text-red-200 mb-1">
+                      ⚠️ This search won't work in Pokémon GO
+                    </h3>
+                    <p className="text-xs text-red-700 dark:text-red-300 mb-3">
+                      These combinations are impossible, but you can still copy if you want to experiment.
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="space-y-3">
+                  {validationResult.errors.map((error, idx) => (
+                    <div key={idx} className="bg-white dark:bg-gray-800 rounded p-3 border border-red-300 dark:border-red-700">
+                      <div className="font-semibold text-sm text-red-900 dark:text-red-100 mb-1">
+                        ❌ {error.issue}
+                      </div>
+                      <div className="text-xs text-red-800 dark:text-red-200 mb-2">
+                        <strong>Why it won't work:</strong> {error.why}
+                      </div>
+                      <div className="text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 p-2 rounded">
+                        <strong>✓ How to fix:</strong> {error.fix}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Validation Warnings - Yellow background, helpful tips */}
+            {validationResult.valid && validationResult.hasWarnings && validationResult.warnings && validationResult.warnings.length > 0 && (
+              <div className="mb-4 p-4 rounded-lg bg-yellow-50 dark:bg-yellow-900/20 border-2 border-yellow-500">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle size={20} className="text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <h3 className="font-semibold text-sm text-yellow-800 dark:text-yellow-200 mb-2">
+                      ℹ️ Heads up
+                    </h3>
+                    <div className="space-y-2">
+                      {validationResult.warnings.map((warning, idx) => (
+                        <div key={idx} className="text-xs text-yellow-700 dark:text-yellow-300">
+                          <div className="font-medium">{warning.issue}</div>
+                          <div>{warning.why}</div>
+                          {warning.suggestion && (
+                            <div className="mt-1 italic">💡 {warning.suggestion}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-bold text-gray-700 dark:text-slate-200">
@@ -1711,17 +1999,17 @@ const PokemonGoSearchBuilder = () => {
                     {Object.keys(filterOperators).length} {getUIText('active', selectedLanguage)}
                   </span>
                 )}
-                {!validationResult.valid && (
+                {!validationResult.valid && validationResult.errors && validationResult.errors.length > 0 && (
                   <div 
                     className="relative"
                     onMouseEnter={() => setShowValidationTooltip(true)}
                     onMouseLeave={() => setShowValidationTooltip(false)}
                   >
-                    <AlertTriangle className="w-4 h-4 text-amber-500 cursor-help" />
+                    <AlertTriangle className="w-4 h-4 text-red-500 cursor-help" />
                     {showValidationTooltip && (
-                      <div className="absolute left-0 top-full mt-2 z-50 px-3 py-2 bg-amber-50 dark:bg-amber-900/80 border-2 border-amber-400 dark:border-amber-500 rounded-lg shadow-xl max-w-xs">
-                        <p className="text-xs font-semibold text-amber-800 dark:text-amber-200">
-                          {validationResult.error}
+                      <div className="absolute left-0 top-full mt-2 z-50 px-3 py-2 bg-red-50 dark:bg-red-900/80 border-2 border-red-400 dark:border-red-500 rounded-lg shadow-xl max-w-xs">
+                        <p className="text-xs font-semibold text-red-800 dark:text-red-200">
+                          {validationResult.errors[0]?.issue || 'Validation error'}
                         </p>
                       </div>
                     )}
@@ -1761,23 +2049,26 @@ const PokemonGoSearchBuilder = () => {
                   readOnly
                   placeholder={getUIText('search_placeholder', selectedLanguage)}
                   className={`w-full min-h-[48px] sm:min-h-[56px] px-4 py-3 border-2 rounded-xl focus:outline-none font-mono text-sm sm:text-base transition-all duration-200 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 cursor-default ${
-                    !validationResult.valid 
-                      ? 'border-amber-400 focus:border-amber-500 focus:ring-2 focus:ring-amber-200 bg-amber-50/50 dark:bg-amber-950/30 dark:border-amber-500 dark:focus:ring-amber-500/40'
+                    !validationResult.valid && validationResult.errors && validationResult.errors.length > 0
+                      ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200 bg-red-50/50 dark:bg-red-950/30 dark:border-red-500 dark:focus:ring-red-500/40'
                       : 'border-blue-200 focus:border-[#0077BE] focus:ring-2 focus:ring-blue-200 bg-white dark:bg-slate-900 dark:border-slate-700 dark:focus:border-cyan-400 dark:focus:ring-cyan-500/40'
                   }`}
                 />
-                {!validationResult.valid && (
+                {!validationResult.valid && validationResult.errors && validationResult.errors.length > 0 && (
                   <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
-                    <AlertTriangle className="w-5 h-5 text-amber-500" />
+                    <AlertTriangle className="w-5 h-5 text-red-500" />
                   </div>
                 )}
               </div>
               <button
                 onClick={copyToClipboard}
+                disabled={!searchString || searchString.trim() === ''}
                 className={`min-h-[48px] sm:min-h-[56px] px-6 sm:px-8 rounded-xl font-bold text-white transition-all duration-200 transform active:scale-95 ${
-                  copySuccess 
-                    ? 'bg-emerald-500 shadow-lg shadow-emerald-200' 
-                    : 'bg-[#0077BE] hover:bg-[#005A8F] hover:shadow-lg hover:shadow-blue-200'
+                  !searchString || searchString.trim() === ''
+                    ? 'bg-gray-400 dark:bg-gray-600 cursor-not-allowed opacity-50'
+                    : copySuccess 
+                      ? 'bg-emerald-500 shadow-lg shadow-emerald-200' 
+                      : 'bg-[#0077BE] hover:bg-[#005A8F] hover:shadow-lg hover:shadow-blue-200'
                 } flex items-center justify-center gap-2 text-sm sm:text-base`}
               >
                 {copySuccess ? (
@@ -1788,7 +2079,9 @@ const PokemonGoSearchBuilder = () => {
                 ) : (
                   <>
                     <Copy className="w-5 h-5" />
-                    <span className="hidden sm:inline">{getUIText('copy', selectedLanguage)}</span>
+                    <span className="hidden sm:inline">
+                      {getUIText('copy', selectedLanguage)}{!validationResult.valid ? ' (Has Issues)' : ''}
+                    </span>
                   </>
                 )}
               </button>
