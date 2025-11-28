@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { 
   Search, Copy, X, ChevronDown, AlertTriangle, Check, 
-  BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords, Plus, Minus,
+  BarChart3, Zap, Sparkles, TrendingUp, Clock, Ruler, Swords,
   Bookmark, BookmarkCheck, Trash2, Download, Upload, Sun, Moon, Globe, MessageCircle
 } from 'lucide-react';
 import { translateSearchString, translateTerm, translateToEnglish, getAvailableLanguages, getLocale } from './utils/translation';
@@ -265,8 +265,10 @@ const filterCategories = {
 
 const PokemonGoSearchBuilder = () => {
   const [searchString, setSearchString] = useState('');
-  const [includedFilters, setIncludedFilters] = useState([]);
-  const [excludedFilters, setExcludedFilters] = useState([]);
+  const [filterOperators, setFilterOperators] = useState({});
+  // Structure: { 'filterId': 'AND' | 'OR' | 'NOT' | null }
+  // null = not selected
+  // Example: { '4*': 'AND', 'shiny': 'OR', 'shadow': 'NOT' }
   const [expandedCategories, setExpandedCategories] = useState({
     stats: true,
     types: false,
@@ -317,6 +319,7 @@ const PokemonGoSearchBuilder = () => {
   const [customAgeValue, setCustomAgeValue] = useState('');
   const [customAgeIncluded, setCustomAgeIncluded] = useState(false);
   const [customAgeExcluded, setCustomAgeExcluded] = useState(false);
+  const [showOperatorHelp, setShowOperatorHelp] = useState(true);
   const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
@@ -455,7 +458,19 @@ const PokemonGoSearchBuilder = () => {
     return [...new Set(conflicts)];
   }, []);
 
-  const conflicts = useMemo(() => getConflicts(includedFilters, excludedFilters), [includedFilters, excludedFilters, getConflicts]);
+  // Extract included and excluded filters from filterOperators for conflict checking
+  const conflicts = useMemo(() => {
+    const included = [];
+    const excluded = [];
+    Object.entries(filterOperators).forEach(([filterId, operator]) => {
+      if (operator === 'AND' || operator === 'OR') {
+        included.push(filterId);
+      } else if (operator === 'NOT') {
+        excluded.push(filterId);
+      }
+    });
+    return getConflicts(included, excluded);
+  }, [filterOperators, getConflicts]);
 
   // Extract Pokedex numbers from a search string
   // Returns the Pokedex number part (e.g., "373,409,464") or empty string
@@ -481,335 +496,117 @@ const PokemonGoSearchBuilder = () => {
     return '';
   }, []);
 
-  // Build search string from included and excluded filters
+  // Helper function to get filter object by ID
+  const getFilterObject = useCallback((id) => {
+    return Object.values(filterCategories)
+      .flatMap(cat => cat.filters)
+      .find(f => f.id === id);
+  }, []);
+
+  // Build search string from filter operators
   // Follows Pokemon GO syntax rules:
-  // - Commas (,) for OR logic (types, multiple special statuses)
-  // - Ampersands (&) for AND logic (combining different filter categories)
-  // - Exclamation (!) for NOT (goes before the term)
-  // - Star ratings can be OR'd together with commas (e.g., "3*,4*" means 3* OR 4*)
-  // - Pokedex numbers are preserved from ref (extracted from search string)
-  // - Terms are translated to selected language before output
-  const buildSearchString = useCallback((included, excluded) => {
-    // Get filter objects for included and excluded
-    const getFilterObject = (id) => {
-      return Object.values(filterCategories)
-        .flatMap(cat => cat.filters)
-        .find(f => f.id === id);
-    };
+  // - & (AND) = Must have ALL conditions
+  // - , (OR) = Can have ANY condition
+  // - ! (NOT) = Exclude condition
+  // - Operator precedence: NOT > AND > OR (commas distribute over &)
+  const buildSearchString = useCallback((selectedFilterOperators, customAge, customAgeOp, lang = 'English') => {
+    try {
+      // Group filters by their operator
+      const andFilters = [];
+      const orFilters = [];
+      const notFilters = [];
 
-    // Helper function to combine consecutive year filters into ranges
-    const combineYearRanges = (timeFilterIds) => {
-      // Separate year filters from other time filters (age, distance)
-      const yearFilters = timeFilterIds.filter(id => id.startsWith('year'));
-      const otherTimeFilters = timeFilterIds.filter(id => !id.startsWith('year'));
-      
-      if (yearFilters.length === 0) {
-        // No year filters, return other time filters as-is
-        return otherTimeFilters.map(id => getFilterObject(id)?.value).filter(Boolean);
-      }
-      
-      // Extract years and sort them
-      const years = yearFilters
-        .map(id => {
-          const match = id.match(/year(\d{4})/);
-          return match ? parseInt(match[1], 10) : null;
-        })
-        .filter(year => year !== null)
-        .sort((a, b) => a - b);
-      
-      // Combine consecutive years into ranges
-      const yearRanges = [];
-      let rangeStart = years[0];
-      let rangeEnd = years[0];
-      
-      for (let i = 1; i < years.length; i++) {
-        if (years[i] === rangeEnd + 1) {
-          // Consecutive year, extend the range
-          rangeEnd = years[i];
-        } else {
-          // Gap found, save current range and start a new one
-          if (rangeStart === rangeEnd) {
-            yearRanges.push(`year${rangeStart}`);
-          } else {
-            yearRanges.push(`year${rangeStart}-${rangeEnd}`);
-          }
-          rangeStart = years[i];
-          rangeEnd = years[i];
-        }
-      }
-      
-      // Add the last range
-      if (rangeStart === rangeEnd) {
-        yearRanges.push(`year${rangeStart}`);
-      } else {
-        yearRanges.push(`year${rangeStart}-${rangeEnd}`);
-      }
-      
-      // Combine year ranges with other time filters
-      return [...yearRanges, ...otherTimeFilters.map(id => getFilterObject(id)?.value).filter(Boolean)];
-    };
+      Object.entries(selectedFilterOperators).forEach(([filterId, operator]) => {
+        const filter = getFilterObject(filterId);
+        if (!filter?.value) return;
 
-    // Categorize filters
-    const starRatings = ['4*', '3*', '2*', '1*', '0*'];
-    const statFilters = ['4attack', '3attack', '4defense', '3defense', '4hp', '3hp', '0attack', '0defense', '0hp'];
-    const typeFilters = filterCategories.types.filters.map(f => f.id);
-    const specialFilters = filterCategories.special.filters.map(f => f.id);
-    const evolutionFilters = filterCategories.evolution.filters.map(f => f.id);
-    const timeFilters = filterCategories.time.filters.map(f => f.id);
-    const sizeFilters = filterCategories.size.filters.map(f => f.id);
-    const moveFilters = filterCategories.moves.filters.map(f => f.id);
-    const regionFilters = filterCategories.regions.filters.map(f => f.id);
+        const value = filter.value;
 
-    // Separate included filters by category
-    const includedStar = included.filter(id => starRatings.includes(id));
-    const includedStats = included.filter(id => statFilters.includes(id));
-    const includedTypes = included.filter(id => typeFilters.includes(id));
-    const includedSpecial = included.filter(id => specialFilters.includes(id));
-    const includedEvolution = included.filter(id => evolutionFilters.includes(id));
-    const includedTime = included.filter(id => timeFilters.includes(id));
-    const includedSize = included.filter(id => sizeFilters.includes(id));
-    const includedMoves = included.filter(id => moveFilters.includes(id));
-    const includedRegions = included.filter(id => regionFilters.includes(id));
-
-    // Separate excluded filters by category
-    const excludedStar = excluded.filter(id => starRatings.includes(id));
-    const excludedStats = excluded.filter(id => statFilters.includes(id));
-    const excludedTypes = excluded.filter(id => typeFilters.includes(id));
-    const excludedSpecial = excluded.filter(id => specialFilters.includes(id));
-    const excludedEvolution = excluded.filter(id => evolutionFilters.includes(id));
-    const excludedTime = excluded.filter(id => timeFilters.includes(id));
-    const excludedSize = excluded.filter(id => sizeFilters.includes(id));
-    const excludedMoves = excluded.filter(id => moveFilters.includes(id));
-    const excludedRegions = excluded.filter(id => regionFilters.includes(id));
-
-    // Build parts of the search string
-    const parts = [];
-
-    // Star ratings: Combine with commas (OR logic) if multiple
-    // This allows searches like 0*,1* for trade fodder
-    if (includedStar.length > 0) {
-      const starValues = includedStar
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (starValues.length > 0) {
-        parts.push(starValues.join(','));
-      }
-    }
-
-    // Stat filters: Combine with commas (OR logic) if multiple
-    if (includedStats.length > 0) {
-      const statValues = includedStats
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (statValues.length > 0) {
-        parts.push(statValues.join(','));
-      }
-    }
-
-    // Types: Combine with commas (OR logic)
-    if (includedTypes.length > 0) {
-      const typeValues = includedTypes
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (typeValues.length > 0) {
-        parts.push(typeValues.join(','));
-      }
-    }
-
-    // Special status: Combine with commas (OR logic) if multiple
-    if (includedSpecial.length > 0) {
-      const specialValues = includedSpecial
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (specialValues.length > 0) {
-        parts.push(specialValues.join(','));
-      }
-    }
-
-    // Evolution: Combine with commas (OR logic) if multiple
-    if (includedEvolution.length > 0) {
-      const evolutionValues = includedEvolution
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (evolutionValues.length > 0) {
-        parts.push(evolutionValues.join(','));
-      }
-    }
-
-    // Time: Combine with commas (OR logic) if multiple, with smart year range detection
-    if (includedTime.length > 0 || customAgeIncluded) {
-      const timeValues = combineYearRanges(includedTime);
-      // Add custom age if included
-      if (customAgeIncluded && customAgeValue) {
-        timeValues.push(customAgeValue);
-      }
-      if (timeValues.length > 0) {
-        parts.push(timeValues.join(','));
-      }
-    }
-
-    // Size: Combine with commas (OR logic) if multiple
-    if (includedSize.length > 0) {
-      const sizeValues = includedSize
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (sizeValues.length > 0) {
-        parts.push(sizeValues.join(','));
-      }
-    }
-
-    // Moves: Combine with commas (OR logic) if multiple
-    if (includedMoves.length > 0) {
-      const moveValues = includedMoves
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (moveValues.length > 0) {
-        parts.push(moveValues.join(','));
-      }
-    }
-
-    // Regions: Combine with commas (OR logic) if multiple
-    if (includedRegions.length > 0) {
-      const regionValues = includedRegions
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean);
-      if (regionValues.length > 0) {
-        parts.push(regionValues.join(','));
-      }
-    }
-
-    // Excluded filters: Add with ! prefix, combine with commas if multiple of same category
-    const excludedParts = [];
-
-    if (excludedStar.length > 0) {
-      const starValues = excludedStar
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (starValues.length > 0) {
-        excludedParts.push(starValues.join(','));
-      }
-    }
-
-    if (excludedStats.length > 0) {
-      const statValues = excludedStats
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (statValues.length > 0) {
-        excludedParts.push(statValues.join(','));
-      }
-    }
-
-    if (excludedTypes.length > 0) {
-      const typeValues = excludedTypes
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (typeValues.length > 0) {
-        excludedParts.push(typeValues.join(','));
-      }
-    }
-
-    if (excludedSpecial.length > 0) {
-      excludedSpecial.forEach(id => {
-        const filter = getFilterObject(id);
-        if (filter?.value) {
-          excludedParts.push(`!${filter.value}`);
+        if (operator === 'AND') {
+          andFilters.push(value);
+        } else if (operator === 'OR') {
+          orFilters.push(value);
+        } else if (operator === 'NOT') {
+          notFilters.push(`!${value}`);
         }
       });
-    }
 
-    if (excludedEvolution.length > 0) {
-      const evolutionValues = excludedEvolution
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (evolutionValues.length > 0) {
-        excludedParts.push(evolutionValues.join(','));
+      // Handle custom age
+      if (customAge && customAge.trim()) {
+        const ageValue = `age${customAge.trim()}`;
+        if (customAgeOp === 'AND') {
+          andFilters.push(ageValue);
+        } else if (customAgeOp === 'OR') {
+          orFilters.push(ageValue);
+        } else if (customAgeOp === 'NOT') {
+          notFilters.push(`!${ageValue}`);
+        }
       }
-    }
 
-    if (excludedTime.length > 0 || customAgeExcluded) {
-      const timeValues = combineYearRanges(excludedTime);
-      // Add custom age if excluded
-      if (customAgeExcluded && customAgeValue) {
-        timeValues.push(customAgeValue);
-      }
-      const excludedTimeValues = timeValues.map(v => `!${v}`);
-      if (excludedTimeValues.length > 0) {
-        excludedParts.push(excludedTimeValues.join(','));
-      }
-    }
+      // Get Pokedex numbers from ref (preserved from manual input)
+      const pokedexNumbers = pokedexNumbersRef.current;
 
-    if (excludedSize.length > 0) {
-      const sizeValues = excludedSize
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (sizeValues.length > 0) {
-        excludedParts.push(sizeValues.join(','));
-      }
-    }
+      // Build the search string following Pokemon GO precedence
+      // Structure: pokedex&andFilters&orFilters&notFilters
+      // where orFilters are joined with commas
 
-    if (excludedMoves.length > 0) {
-      const moveValues = excludedMoves
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (moveValues.length > 0) {
-        excludedParts.push(moveValues.join(','));
-      }
-    }
+      const parts = [];
 
-    if (excludedRegions.length > 0) {
-      const regionValues = excludedRegions
-        .map(id => getFilterObject(id)?.value)
-        .filter(Boolean)
-        .map(v => `!${v}`);
-      if (regionValues.length > 0) {
-        excludedParts.push(regionValues.join(','));
+      // 1. Pokedex numbers first (if any)
+      if (pokedexNumbers) {
+        parts.push(pokedexNumbers);
       }
-    }
 
-    // Get Pokedex numbers from ref (preserved from previous search string)
-    const pokedexNumbers = pokedexNumbersRef.current;
-    
-    // Combine all filter parts with & (AND logic)
-    // First add included parts, then excluded parts
-    const allFilterParts = [...parts, ...excludedParts];
-    
-    // Build the final search string
-    const finalParts = [];
-    
-    // Add Pokedex numbers first (if they exist)
-    if (pokedexNumbers) {
-      finalParts.push(pokedexNumbers);
+      // 2. AND filters (join with &)
+      if (andFilters.length > 0) {
+        parts.push(andFilters.join('&'));
+      }
+
+      // 3. OR filters (join with ,)
+      if (orFilters.length > 0) {
+        parts.push(orFilters.join(','));
+      }
+
+      // 4. NOT filters (join with &)
+      if (notFilters.length > 0) {
+        parts.push(notFilters.join('&'));
+      }
+
+      // Join all parts with &
+      let result = parts.filter(p => p).join('&');
+
+      // Validate the result
+      const validation = validateSearchString(result);
+      if (!validation.valid) {
+        const errorMessages = validation.errors && validation.errors.length > 0
+          ? validation.errors.map(err => err.message || err)
+          : ['Invalid search string'];
+        setValidationResult({
+          valid: false,
+          error: errorMessages.length === 1 ? errorMessages[0] : errorMessages.join('; ')
+        });
+      } else {
+        setValidationResult({ valid: true });
+      }
+
+      // Translate if not English
+      if (lang !== 'English' && result) {
+        const translationResult = translateSearchString(result, lang, true);
+        setTranslationWarnings(translationResult.warnings || []);
+        return translationResult.translated;
+      }
+
+      setTranslationWarnings([]);
+      return result;
+    } catch (error) {
+      console.error('Error building search string:', error);
+      setValidationResult({
+        valid: false,
+        error: 'Error building search string'
+      });
+      return '';
     }
-    
-    // Add filter parts
-    if (allFilterParts.length > 0) {
-      finalParts.push(...allFilterParts);
-    }
-    
-    // CRITICAL: Join with & (no spaces) - this ensures Pokedex numbers and filters are separated by &
-    if (finalParts.length === 0) return '';
-    
-    let result = finalParts.join('&');
-    
-    // Translate the search string to the selected language
-    if (selectedLanguage !== 'English' && result) {
-      result = translateSearchString(result, selectedLanguage);
-    }
-    
-    // Validate the generated search string as a safety check
-    const validation = validateSearchString(result);
-    if (!validation.valid && process.env.NODE_ENV === 'development') {
-      console.warn(`Generated invalid search string: "${result}" - ${validation.error}`);
-    }
-    
-    return result;
-  }, [selectedLanguage, customAgeIncluded, customAgeExcluded, customAgeValue]);
+  }, [getFilterObject]);
 
   // Save language preference to localStorage
   React.useEffect(() => {
@@ -856,10 +653,16 @@ const PokemonGoSearchBuilder = () => {
   // Update search string when filters change (but not if it's a premade search)
   React.useEffect(() => {
     if (!isPremadeSearch) {
-      const newSearchString = buildSearchString(includedFilters, excludedFilters);
+      const customAgeOp = customAgeIncluded ? 'AND' : customAgeExcluded ? 'NOT' : null;
+      const newSearchString = buildSearchString(
+        filterOperators,
+        customAgeValue,
+        customAgeOp,
+        selectedLanguage
+      );
       setSearchString(newSearchString);
     }
-  }, [includedFilters, excludedFilters, isPremadeSearch, buildSearchString]);
+  }, [filterOperators, customAgeValue, customAgeIncluded, customAgeExcluded, selectedLanguage, isPremadeSearch, buildSearchString]);
 
   // Validate search string whenever it changes
   React.useEffect(() => {
@@ -886,35 +689,23 @@ const PokemonGoSearchBuilder = () => {
     }
   }, [searchString, selectedLanguage]);
 
-  const toggleIncludeFilter = (filterId) => {
+  const setFilterOperator = (filterId, operator) => {
     setIsPremadeSearch(false);
-    setIncludedFilters(prev => {
-      if (prev.includes(filterId)) {
-        return prev.filter(id => id !== filterId);
-      } else {
-        // Remove from excluded if it's there
-        setExcludedFilters(prevExcluded => prevExcluded.filter(id => id !== filterId));
-        
-        // Allow multiple star ratings (they'll be OR'd together with commas)
-        
-        return [...prev, filterId];
+    setFilterOperators(prev => {
+      const current = prev[filterId];
+      
+      // If clicking same operator, deselect it
+      if (current === operator) {
+        const newState = { ...prev };
+        delete newState[filterId];
+        return newState;
       }
-    });
-  };
-
-  const toggleExcludeFilter = (filterId) => {
-    setIsPremadeSearch(false);
-    setExcludedFilters(prev => {
-      if (prev.includes(filterId)) {
-        return prev.filter(id => id !== filterId);
-      } else {
-        // Remove from included if it's there
-        setIncludedFilters(prevIncluded => prevIncluded.filter(id => id !== filterId));
-        
-        // Allow multiple star ratings (they'll be OR'd together with commas)
-        
-        return [...prev, filterId];
-      }
+      
+      // Otherwise, set the new operator
+      return {
+        ...prev,
+        [filterId]: operator
+      };
     });
   };
 
@@ -948,22 +739,21 @@ const PokemonGoSearchBuilder = () => {
     }
   };
 
-  const removeFilter = (filterId, isExcluded = false) => {
+  const removeFilter = (filterId) => {
     setIsPremadeSearch(false);
     setRemovingChip(filterId);
     setTimeout(() => {
-      if (isExcluded) {
-        setExcludedFilters(prev => prev.filter(id => id !== filterId));
-      } else {
-        setIncludedFilters(prev => prev.filter(id => id !== filterId));
-      }
+      setFilterOperators(prev => {
+        const newState = { ...prev };
+        delete newState[filterId];
+        return newState;
+      });
       setRemovingChip(null);
     }, 300);
   };
 
   const clearAll = () => {
-    setIncludedFilters([]);
-    setExcludedFilters([]);
+    setFilterOperators({});
     setSearchString('');
     setTranslationWarnings([]);
     setIsPremadeSearch(false);
@@ -973,58 +763,131 @@ const PokemonGoSearchBuilder = () => {
     pokedexNumbersRef.current = ''; // Clear Pokedex numbers ref
   };
 
-  // Parse search string to extract filter IDs (included and excluded)
-  // Handles Pokemon GO syntax: filters separated by &, comma-separated values within parts
+  // Helper function to find filter by value
+  const findFilterByValue = useCallback((value) => {
+    return Object.values(filterCategories)
+      .flatMap(cat => cat.filters)
+      .find(f => f.value === value);
+  }, []);
+
+  // Parse search string to extract filter operators
+  // Handles Pokemon GO syntax: & for AND, , for OR, ! for NOT
   // Also handles translated search strings by converting them to English first
-  const parseSearchStringToFilters = (searchStr) => {
+  const parseSearchStringToFilters = useCallback((searchStr) => {
     if (!searchStr || searchStr.trim() === '') {
-      return { included: [], excluded: [] };
+      setFilterOperators({});
+      pokedexNumbersRef.current = '';
+      return;
     }
-    
-    // Translate to English first if needed (for parsing)
-    // This allows users to paste translated strings and have them parsed correctly
-    let englishSearchStr = searchStr;
-    if (selectedLanguage !== 'English') {
-      // Try to translate back to English for parsing
-      englishSearchStr = translateToEnglish(searchStr, selectedLanguage);
+
+    try {
+      // Convert to English if translated
+      const englishStr = selectedLanguage !== 'English' 
+        ? translateToEnglish(searchStr, selectedLanguage) 
+        : searchStr;
+      
+      // Extract Pokedex numbers
+      extractPokedexNumbers(englishStr);
+      
+      // Parse the search string by analyzing its structure
+      // Split by & to get major parts
+      const parts = englishStr.split('&').map(p => p.trim()).filter(p => p);
+      
+      const newOperators = {};
+      let customAgeFound = null;
+      let customAgeOp = null;
+      
+      parts.forEach(part => {
+        // Skip Pokedex numbers (all digits and commas)
+        if (/^[\d,]+$/.test(part)) {
+          return;
+        }
+        
+        // Check if this part contains commas (OR logic)
+        if (part.includes(',')) {
+          // This is an OR group - split by comma
+          const orValues = part.split(',').map(v => v.trim()).filter(v => v);
+          orValues.forEach(value => {
+            // Check for NOT prefix
+            if (value.startsWith('!')) {
+              const cleanValue = value.substring(1);
+              // Check if it's custom age
+              if (cleanValue.startsWith('age')) {
+                const ageValue = cleanValue.substring(3);
+                customAgeFound = ageValue;
+                customAgeOp = 'NOT';
+              } else {
+                const filter = findFilterByValue(cleanValue);
+                if (filter) {
+                  newOperators[filter.id] = 'NOT';
+                }
+              }
+            } else {
+              // Check if it's custom age
+              if (value.startsWith('age')) {
+                const ageValue = value.substring(3);
+                customAgeFound = ageValue;
+                customAgeOp = 'OR';
+              } else {
+                const filter = findFilterByValue(value);
+                if (filter) {
+                  newOperators[filter.id] = 'OR';
+                }
+              }
+            }
+          });
+        } else {
+          // This is a single filter or AND group
+          // Check for NOT prefix
+          if (part.startsWith('!')) {
+            const cleanValue = part.substring(1);
+            // Check if it's custom age
+            if (cleanValue.startsWith('age')) {
+              const ageValue = cleanValue.substring(3);
+              customAgeFound = ageValue;
+              customAgeOp = 'NOT';
+            } else {
+              const filter = findFilterByValue(cleanValue);
+              if (filter) {
+                newOperators[filter.id] = 'NOT';
+              }
+            }
+          } else {
+            // Check if it's custom age
+            if (part.startsWith('age')) {
+              const ageValue = part.substring(3);
+              customAgeFound = ageValue;
+              customAgeOp = 'AND';
+            } else {
+              const filter = findFilterByValue(part);
+              if (filter) {
+                newOperators[filter.id] = 'AND';
+              }
+            }
+          }
+        }
+      });
+      
+      setFilterOperators(newOperators);
+      
+      // Handle custom age
+      if (customAgeFound !== null) {
+        setCustomAgeValue(customAgeFound);
+        if (customAgeOp === 'AND') {
+          setCustomAgeIncluded(true);
+          setCustomAgeExcluded(false);
+        } else if (customAgeOp === 'OR') {
+          setCustomAgeIncluded(true);
+          setCustomAgeExcluded(false);
+        } else if (customAgeOp === 'NOT') {
+          setCustomAgeIncluded(false);
+          setCustomAgeExcluded(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing search string:', error);
     }
-    
-    // Use the new parser to extract filters
-    const result = parseSearchString(englishSearchStr);
-    
-    // Map filter values to filter IDs
-    const includedIds = [];
-    const excludedIds = [];
-    
-    // Map included filter values to IDs
-    result.included.forEach(filterValue => {
-      // Skip Pokedex numbers (all digits and commas)
-      if (/^[\d,]+$/.test(filterValue)) {
-        return;
-      }
-      
-      const filter = Object.values(filterCategories)
-        .flatMap(cat => cat.filters)
-        .find(f => f.value === filterValue);
-      
-      if (filter) {
-        includedIds.push(filter.id);
-      }
-    });
-    
-    // Map excluded filter values to IDs
-    result.excluded.forEach(filterValue => {
-      const filter = Object.values(filterCategories)
-        .flatMap(cat => cat.filters)
-        .find(f => f.value === filterValue);
-      
-      if (filter) {
-        excludedIds.push(filter.id);
-      }
-    });
-    
-    return { included: includedIds, excluded: excludedIds };
-  };
+  }, [selectedLanguage, findFilterByValue, extractPokedexNumbers]);
 
   const copyToClipboard = async () => {
     // Validate before copying
@@ -1297,17 +1160,16 @@ const PokemonGoSearchBuilder = () => {
     const cleanCombo = comboString.startsWith('&') ? comboString.substring(1) : comboString;
     const { included: newIncluded, excluded: newExcluded } = parseSearchStringToFilters(cleanCombo);
     
-    // Merge with existing filters
-    setIncludedFilters(prev => {
-      const merged = [...prev, ...newIncluded];
-      // Remove duplicates
-      return [...new Set(merged)];
-    });
-    
-    setExcludedFilters(prev => {
-      const merged = [...prev, ...newExcluded];
-      // Remove duplicates
-      return [...new Set(merged)];
+    // Merge with existing filters - default to AND for included, NOT for excluded
+    setFilterOperators(prev => {
+      const newState = { ...prev };
+      newIncluded.forEach(filterId => {
+        newState[filterId] = 'AND';
+      });
+      newExcluded.forEach(filterId => {
+        newState[filterId] = 'NOT';
+      });
+      return newState;
     });
     
     // Append to search string
@@ -1476,7 +1338,8 @@ const PokemonGoSearchBuilder = () => {
       ? translateToEnglish(savedSearch.searchString, selectedLanguage)
       : savedSearch.searchString;
     
-    const { included, excluded } = parseSearchStringToFilters(englishString);
+    // ParseSearchStringToFilters now sets filterOperators state directly
+    parseSearchStringToFilters(englishString);
     extractPokedexNumbers(englishString);
     
     // If the saved search was in a different language, translate it to current language
@@ -1488,8 +1351,6 @@ const PokemonGoSearchBuilder = () => {
       setTranslationWarnings([]);
     }
     
-    setIncludedFilters(included);
-    setExcludedFilters(excluded);
     setIsPremadeSearch(true);
   };
 
@@ -1641,13 +1502,11 @@ const PokemonGoSearchBuilder = () => {
       // Extract and preserve Pokedex numbers from the premade search string
       extractPokedexNumbers(preset.searchString);
       
-      // Parse the search string to extract filter tags (preset.searchString is in English)
-      const { included, excluded } = parseSearchStringToFilters(preset.searchString);
+      // ParseSearchStringToFilters now sets filterOperators state directly
+      parseSearchStringToFilters(preset.searchString);
       
-      // Set the search string and filters (translate if needed)
+      // Set the search string (translate if needed)
       setTranslatedSearchString(preset.searchString);
-      setIncludedFilters(included);
-      setExcludedFilters(excluded);
       setIsPremadeSearch(true);
 
       // Copy to clipboard
@@ -1847,9 +1706,9 @@ const PokemonGoSearchBuilder = () => {
                 <label className="text-sm font-bold text-gray-700 dark:text-slate-200">
                   {getUIText('search_string', selectedLanguage)}
                 </label>
-                {(includedFilters.length > 0 || excludedFilters.length > 0) && (
+                {Object.keys(filterOperators).length > 0 && (
                   <span className="px-2 py-0.5 bg-[#0077BE] text-white text-xs font-bold rounded-full">
-                    {includedFilters.length + excludedFilters.length} {getUIText('active', selectedLanguage)}
+                    {Object.keys(filterOperators).length} {getUIText('active', selectedLanguage)}
                   </span>
                 )}
                 {!validationResult.valid && (
@@ -1974,98 +1833,76 @@ const PokemonGoSearchBuilder = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* Active Filter Chips - Compact Display */}
-        {(includedFilters.length > 0 || excludedFilters.length > 0 || customAgeIncluded || customAgeExcluded) && (
+        {(Object.keys(filterOperators).length > 0 || (customAgeValue && (customAgeIncluded || customAgeExcluded))) && (
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-slate-800">
             <div className="flex flex-wrap gap-2">
-              {includedFilters.map(filterId => {
-                const isRemoving = removingChip === filterId;
+              {Object.entries(filterOperators).map(([filterId, operator]) => {
+                const filter = getFilterObject(filterId);
+                if (!filter) return null;
+
+                const symbols = { 'AND': '&', 'OR': ',', 'NOT': '!' };
+                const colors = {
+                  'AND': isDarkMode 
+                    ? 'bg-blue-600 border-blue-500 text-blue-100' 
+                    : 'bg-blue-100 border-blue-300 text-blue-800',
+                  'OR': isDarkMode 
+                    ? 'bg-green-600 border-green-500 text-green-100' 
+                    : 'bg-green-100 border-green-300 text-green-800',
+                  'NOT': isDarkMode 
+                    ? 'bg-red-600 border-red-500 text-red-100' 
+                    : 'bg-red-100 border-red-300 text-red-800'
+                };
+
                 return (
                   <div
-                    key={`included-${filterId}`}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#0077BE] to-[#00A7E5] text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
-                      isRemoving ? 'chip-fade-out' : 'chip-fade-in'
-                    }`}
+                    key={filterId}
+                    className={`
+                      flex items-center gap-2 px-3 py-1.5 rounded-full text-sm
+                      border-2 transition-all duration-300
+                      ${colors[operator]}
+                      ${removingChip === filterId ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}
+                    `}
                   >
-                    <Plus className="w-3 h-3" />
-                    <span className="whitespace-nowrap">{getChipLabel(filterId)}</span>
+                    <span className="font-mono font-bold text-xs">{symbols[operator]}</span>
+                    <span>{filter.label}</span>
                     <button
-                      onClick={() => removeFilter(filterId, false)}
-                      className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
-                      aria-label="Remove filter"
+                      onClick={() => removeFilter(filterId)}
+                      className="hover:scale-110 transition-transform"
                     >
-                      <X className="w-3 h-3" />
+                      <X size={14} />
                     </button>
                   </div>
                 );
               })}
-              {customAgeIncluded && customAgeValue && (
+              {customAgeValue && (customAgeIncluded || customAgeExcluded) && (
                 <div
-                  key="included-customAge"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-[#0077BE] to-[#00A7E5] text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
-                    removingChip === 'customAge' ? 'chip-fade-out' : 'chip-fade-in'
-                  }`}
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm
+                    border-2 transition-all
+                    ${customAgeIncluded 
+                      ? (isDarkMode ? 'bg-blue-600 border-blue-500 text-blue-100' : 'bg-blue-100 border-blue-300 text-blue-800')
+                      : (isDarkMode ? 'bg-red-600 border-red-500 text-red-100' : 'bg-red-100 border-red-300 text-red-800')
+                    }
+                    ${removingChip === 'customAge' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}
+                  `}
                 >
-                  <Plus className="w-3 h-3" />
-                  <span className="whitespace-nowrap">{getChipLabel('customAge')}</span>
+                  <span className="font-mono font-bold text-xs">
+                    {customAgeIncluded ? '&' : '!'}
+                  </span>
+                  <span>age{customAgeValue}</span>
                   <button
                     onClick={() => {
                       setRemovingChip('customAge');
                       setTimeout(() => {
                         setCustomAgeIncluded(false);
-                        setCustomAgeValue('');
-                        setRemovingChip(null);
-                      }, 300);
-                    }}
-                    className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
-                    aria-label="Remove filter"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                </div>
-              )}
-              {excludedFilters.map(filterId => {
-                const isRemoving = removingChip === filterId;
-                return (
-                  <div
-                    key={`excluded-${filterId}`}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
-                      isRemoving ? 'chip-fade-out' : 'chip-fade-in'
-                    }`}
-                  >
-                    <Minus className="w-3 h-3" />
-                    <span className="whitespace-nowrap">{getChipLabel(filterId)}</span>
-                    <button
-                      onClick={() => removeFilter(filterId, true)}
-                      className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
-                      aria-label="Remove filter"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
-                  </div>
-                );
-              })}
-              {customAgeExcluded && customAgeValue && (
-                <div
-                  key="excluded-customAge"
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-full text-xs font-semibold transition-all duration-200 shadow-sm hover:shadow-md ${
-                    removingChip === 'customAge' ? 'chip-fade-out' : 'chip-fade-in'
-                  }`}
-                >
-                  <Minus className="w-3 h-3" />
-                  <span className="whitespace-nowrap">{getChipLabel('customAge')}</span>
-                  <button
-                    onClick={() => {
-                      setRemovingChip('customAge');
-                      setTimeout(() => {
                         setCustomAgeExcluded(false);
                         setCustomAgeValue('');
                         setRemovingChip(null);
                       }, 300);
                     }}
-                    className="ml-1 hover:bg-white/20 rounded-full p-0.5 transition-colors touch-manipulation"
-                    aria-label="Remove filter"
+                    className="hover:scale-110 transition-transform"
                   >
-                    <X className="w-3 h-3" />
+                    <X size={14} />
                   </button>
                 </div>
               )}
@@ -2592,6 +2429,65 @@ const PokemonGoSearchBuilder = () => {
           </div>
         </div>
 
+        {/* Operator Help Section */}
+        <div className={`
+          mb-6 rounded-lg border-2 transition-all
+          ${isDarkMode ? 'bg-gray-800 border-gray-700' : 'bg-blue-50 border-blue-200'}
+        `}>
+          <button
+            onClick={() => setShowOperatorHelp(!showOperatorHelp)}
+            className="w-full p-4 flex items-center justify-between hover:opacity-80 transition-opacity"
+          >
+            <div className="flex items-center gap-2">
+              <Search size={18} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} />
+              <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-100">How to use the filter buttons</h3>
+            </div>
+            <ChevronDown 
+              size={20} 
+              className={`transform transition-transform ${showOperatorHelp ? 'rotate-180' : ''} ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}
+            />
+          </button>
+          
+          {showOperatorHelp && (
+            <div className="px-4 pb-4">
+              <div className="space-y-2 text-xs">
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1.5 rounded bg-blue-500 text-white font-bold min-w-[70px] text-center flex flex-col items-center">
+                    <span className="text-xs">AND</span>
+                    <span className="font-mono text-[10px] opacity-70">&</span>
+                  </span>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                    Must have this filter - combines with other AND filters (Example: Shiny AND Legendary shows only shiny legendaries)
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1.5 rounded bg-green-500 text-white font-bold min-w-[70px] text-center flex flex-col items-center">
+                    <span className="text-xs">OR</span>
+                    <span className="font-mono text-[10px] opacity-70">,</span>
+                  </span>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                    Can have any of these - shows alternatives (Example: 4★ OR 3★ shows all 3-star and 4-star Pokémon)
+                  </span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="px-3 py-1.5 rounded bg-red-500 text-white font-bold min-w-[70px] text-center flex flex-col items-center">
+                    <span className="text-xs">NOT</span>
+                    <span className="font-mono text-[10px] opacity-70">!</span>
+                  </span>
+                  <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
+                    Exclude this filter - hides matching Pokémon (Example: NOT Shadow excludes all shadow Pokémon)
+                  </span>
+                </div>
+              </div>
+              <div className={`mt-3 pt-3 border-t ${isDarkMode ? 'border-gray-700' : 'border-blue-300'}`}>
+                <p className={`text-xs italic ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                  💡 Tip: You can combine operators! Try "4★ AND Legendary OR Mythical AND NOT Shadow" to find perfect IV legendaries/mythicals that aren't shadow.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+
         {/* Filter Categories - Modern Accordion */}
         <div className="space-y-3 sm:space-y-4">
           {Object.entries(filteredCategories).map(([key, category]) => {
@@ -2599,7 +2495,7 @@ const PokemonGoSearchBuilder = () => {
             const Icon = meta.icon;
             const isExpanded = expandedCategories[key];
             const activeCount = category.filters.filter(f => 
-              includedFilters.includes(f.id) || excludedFilters.includes(f.id)
+              filterOperators[f.id] !== undefined
             ).length + (key === 'time' && (customAgeIncluded || customAgeExcluded) ? 1 : 0);
             
             return (
@@ -2635,61 +2531,51 @@ const PokemonGoSearchBuilder = () => {
                   <div className="category-expand p-4 sm:p-5 bg-white dark:bg-slate-950/60">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {category.filters.map(filter => {
-                        const isIncluded = includedFilters.includes(filter.id);
-                        const isExcluded = excludedFilters.includes(filter.id);
+                        const currentOperator = filterOperators[filter.id];
+                        const operators = [
+                          { key: 'AND', symbol: '&', label: 'AND', description: 'Must have this' },
+                          { key: 'OR', symbol: ',', label: 'OR', description: 'Can have this' },
+                          { key: 'NOT', symbol: '!', label: 'NOT', description: 'Exclude this' }
+                        ];
+                        
+                        const colors = {
+                          'AND': isDarkMode ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-500 hover:bg-blue-600',
+                          'OR': isDarkMode ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600',
+                          'NOT': isDarkMode ? 'bg-red-600 hover:bg-red-700' : 'bg-red-500 hover:bg-red-600'
+                        };
                         
                         return (
-                          <Tooltip key={filter.id} filterId={filter.id}>
-                            <div
-                              className={`group flex items-center gap-2 p-3 min-h-[48px] rounded-xl transition-all duration-200 border-2 cursor-pointer touch-manipulation ${
-                                isIncluded 
-                                  ? 'bg-blue-50 border-blue-400 shadow-sm dark:bg-blue-500/10 dark:border-blue-400/60'
-                                  : isExcluded
-                                  ? 'bg-red-50 border-red-400 shadow-sm dark:bg-red-500/10 dark:border-red-400/60'
-                                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300 hover:shadow-sm dark:bg-slate-900 dark:border-slate-700 dark:hover:bg-slate-800 dark:hover:border-slate-600'
-                              }`}
-                            >
-                              <span className={`text-sm font-medium flex-1 ${
-                                isIncluded ? 'text-blue-800 dark:text-blue-200' : isExcluded ? 'text-red-800 dark:text-red-200' : 'text-gray-800 dark:text-slate-100'
-                              }`}>
-                                {translateFilterLabel(filter, selectedLanguage)}
-                              </span>
-                              <div className="flex gap-1.5">
+                          <div
+                            key={filter.id}
+                            className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
+                          >
+                            <span className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-100">
+                              {filter.label}
+                            </span>
+                            <div className="flex gap-1">
+                              {operators.map(op => (
                                 <button
+                                  key={op.key}
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    toggleIncludeFilter(filter.id);
+                                    setFilterOperator(filter.id, op.key);
                                   }}
-                                  className={`min-w-[48px] min-h-[48px] px-2 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center active:scale-95 filter-button-plus ${
-                                    isIncluded
-                                      ? 'filter-button-plus-selected'
-                                      : isExcluded
-                                      ? 'filter-button-plus-disabled'
-                                      : 'filter-button-plus-default'
-                                  }`}
-                                  title={getUIText('include', selectedLanguage)}
+                                  className={`
+                                    px-2 py-1.5 rounded text-xs font-medium transition-all active:scale-95
+                                    flex flex-col items-center gap-0.5 min-w-[50px]
+                                    ${currentOperator === op.key 
+                                      ? colors[op.key] + ' text-white shadow-md scale-105' 
+                                      : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                                    }
+                                  `}
+                                  title={op.description}
                                 >
-                                  <Plus className="w-4 h-4" />
+                                  <span className="font-bold text-xs">{op.label}</span>
+                                  <span className="font-mono text-[10px] opacity-70">{op.symbol}</span>
                                 </button>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    toggleExcludeFilter(filter.id);
-                                  }}
-                                  className={`min-w-[48px] min-h-[48px] px-2 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 flex items-center justify-center active:scale-95 filter-button-minus ${
-                                    isExcluded
-                                      ? 'filter-button-minus-selected'
-                                      : isIncluded
-                                      ? 'filter-button-minus-disabled'
-                                      : 'filter-button-minus-default'
-                                  }`}
-                                  title={getUIText('exclude', selectedLanguage)}
-                                >
-                                  <Minus className="w-4 h-4" />
-                                </button>
-                              </div>
+                              ))}
                             </div>
-                          </Tooltip>
+                          </div>
                         );
                       })}
                       {/* Custom Age Input - only show in time category */}
