@@ -41,6 +41,12 @@ const categoryMeta = {
     gradient: 'from-teal-500 to-cyan-500',
     chipColor: 'bg-teal-500'
   },
+  typeEffectiveness: {
+    nameKey: 'type_effectiveness',
+    icon: Zap,
+    gradient: 'from-yellow-500 to-amber-500',
+    chipColor: 'bg-yellow-500'
+  },
   size: { 
     nameKey: 'size_gender',
     icon: Ruler, 
@@ -261,6 +267,50 @@ const filterCategories = {
       { id: 'paldea', label: 'Paldea (Gen 9)', value: 'paldea' },
     ]
   },
+  typeEffectiveness: {
+    nameKey: 'type_effectiveness',
+    filters: [
+      // Strong Against (Counters) - uses > operator
+      { id: 'strong_normal', label: 'Strong Against Normal', value: '>normal' },
+      { id: 'strong_fire', label: 'Strong Against Fire', value: '>fire' },
+      { id: 'strong_water', label: 'Strong Against Water', value: '>water' },
+      { id: 'strong_electric', label: 'Strong Against Electric', value: '>electric' },
+      { id: 'strong_grass', label: 'Strong Against Grass', value: '>grass' },
+      { id: 'strong_ice', label: 'Strong Against Ice', value: '>ice' },
+      { id: 'strong_fighting', label: 'Strong Against Fighting', value: '>fighting' },
+      { id: 'strong_poison', label: 'Strong Against Poison', value: '>poison' },
+      { id: 'strong_ground', label: 'Strong Against Ground', value: '>ground' },
+      { id: 'strong_flying', label: 'Strong Against Flying', value: '>flying' },
+      { id: 'strong_psychic', label: 'Strong Against Psychic', value: '>psychic' },
+      { id: 'strong_bug', label: 'Strong Against Bug', value: '>bug' },
+      { id: 'strong_rock', label: 'Strong Against Rock', value: '>rock' },
+      { id: 'strong_ghost', label: 'Strong Against Ghost', value: '>ghost' },
+      { id: 'strong_dragon', label: 'Strong Against Dragon', value: '>dragon' },
+      { id: 'strong_dark', label: 'Strong Against Dark', value: '>dark' },
+      { id: 'strong_steel', label: 'Strong Against Steel', value: '>steel' },
+      { id: 'strong_fairy', label: 'Strong Against Fairy', value: '>fairy' },
+
+      // Weak To (Vulnerable) - uses < operator
+      { id: 'weak_normal', label: 'Weak To Normal', value: '<normal' },
+      { id: 'weak_fire', label: 'Weak To Fire', value: '<fire' },
+      { id: 'weak_water', label: 'Weak To Water', value: '<water' },
+      { id: 'weak_electric', label: 'Weak To Electric', value: '<electric' },
+      { id: 'weak_grass', label: 'Weak To Grass', value: '<grass' },
+      { id: 'weak_ice', label: 'Weak To Ice', value: '<ice' },
+      { id: 'weak_fighting', label: 'Weak To Fighting', value: '<fighting' },
+      { id: 'weak_poison', label: 'Weak To Poison', value: '<poison' },
+      { id: 'weak_ground', label: 'Weak To Ground', value: '<ground' },
+      { id: 'weak_flying', label: 'Weak To Flying', value: '<flying' },
+      { id: 'weak_psychic', label: 'Weak To Psychic', value: '<psychic' },
+      { id: 'weak_bug', label: 'Weak To Bug', value: '<bug' },
+      { id: 'weak_rock', label: 'Weak To Rock', value: '<rock' },
+      { id: 'weak_ghost', label: 'Weak To Ghost', value: '<ghost' },
+      { id: 'weak_dragon', label: 'Weak To Dragon', value: '<dragon' },
+      { id: 'weak_dark', label: 'Weak To Dark', value: '<dark' },
+      { id: 'weak_steel', label: 'Weak To Steel', value: '<steel' },
+      { id: 'weak_fairy', label: 'Weak To Fairy', value: '<fairy' },
+    ]
+  },
 };
 
 const PokemonGoSearchBuilder = () => {
@@ -275,6 +325,7 @@ const PokemonGoSearchBuilder = () => {
     special: false,
     evolution: false,
     time: false,
+    typeEffectiveness: false,
     size: false,
     moves: false,
     regions: false,
@@ -2852,6 +2903,11 @@ const PokemonGoSearchBuilder = () => {
                   {getUIText('operator_tip', selectedLanguage)}
                 </p>
               </div>
+              <div className={`mt-3 pt-3 border-t ${isDarkMode ? 'border-gray-700' : 'border-blue-300'}`}>
+                <p className={`text-xs ${isDarkMode ? 'text-gray-300' : 'text-gray-700'}`}>
+                  {getUIText('type_effectiveness_help', selectedLanguage)}
+                </p>
+              </div>
             </div>
           )}
         </div>
@@ -2876,8 +2932,13 @@ const PokemonGoSearchBuilder = () => {
                   <div className="flex items-center gap-3 sm:gap-4 flex-1">
                     <Icon className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
                     <div className="flex items-center gap-2 flex-1 min-w-0">
-                      <span className="font-bold text-sm sm:text-base truncate">
+                      <span className="font-bold text-sm sm:text-base truncate flex items-center gap-2">
                         {getUIText(category.nameKey, selectedLanguage)}
+                        {key === 'typeEffectiveness' && (
+                          <span className="text-[10px] sm:text-xs font-semibold text-red-200 bg-red-700/70 px-2 py-0.5 rounded-full uppercase tracking-wide">
+                            Work in Progress – may have issues
+                          </span>
+                        )}
                       </span>
                       <span className="text-xs sm:text-sm opacity-90">
                         ({category.filters.length})

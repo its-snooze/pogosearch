@@ -49,6 +49,34 @@ export const premadeSearches = (selectedLanguage) => ({
     searchString: '888,484,889,483,646,644,643,249,376,890,800,792,250,383,381,648,671,468,791',
     tier: 'PvP',
     type: 'Master League'
+  },
+  counterDragonite: {
+    label: getUIText('premade_counter_dragonite', selectedLanguage),
+    description: getUIText('premade_counter_dragonite_desc', selectedLanguage),
+    searchString: '>flying,>dragon&!<flying,!<dragon',
+    tier: 'Type',
+    type: 'Type Effectiveness'
+  },
+  counterRaidBossFlying: {
+    label: getUIText('premade_counter_raid_boss_flying', selectedLanguage),
+    description: getUIText('premade_counter_raid_boss_flying_desc', selectedLanguage),
+    searchString: '>electric,>rock,>ice',
+    tier: 'Type',
+    type: 'Type Effectiveness'
+  },
+  tankiestVsFire: {
+    label: getUIText('premade_tankiest_vs_fire', selectedLanguage),
+    description: getUIText('premade_tankiest_vs_fire_desc', selectedLanguage),
+    searchString: '!<fire&!fire',
+    tier: 'Type',
+    type: 'Type Effectiveness'
+  },
+  counterMetaDragons: {
+    label: getUIText('premade_counter_meta_dragons', selectedLanguage),
+    description: getUIText('premade_counter_meta_dragons_desc', selectedLanguage),
+    searchString: '>dragon,>ice,>fairy&!<dragon',
+    tier: 'Type',
+    type: 'Type Effectiveness'
   }
 });
 
