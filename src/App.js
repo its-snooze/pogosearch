@@ -376,6 +376,12 @@ const PokemonGoSearchBuilder = () => {
   const [customAgeIncluded, setCustomAgeIncluded] = useState(false);
   const [customAgeExcluded, setCustomAgeExcluded] = useState(false);
   const [showOperatorHelp, setShowOperatorHelp] = useState(true);
+  const [customMinCP, setCustomMinCP] = useState('');
+  const [customMaxCP, setCustomMaxCP] = useState('');
+  const [customCPOperator, setCustomCPOperator] = useState('AND');
+  const [cpRangeError, setCPRangeError] = useState('');
+  const [cpRangeValue, setCPRangeValue] = useState('');
+  const [cpRangeOperator, setCPRangeOperator] = useState('AND');
   const MAX_SAVED_SEARCHES = 15;
   
   // Ref to store Pokedex numbers extracted from search string
@@ -763,7 +769,7 @@ const PokemonGoSearchBuilder = () => {
   // - , (OR) = Can have ANY condition
   // - ! (NOT) = Exclude condition
   // - Operator precedence: NOT > AND > OR (commas distribute over &)
-  const buildSearchString = useCallback((filterOps, customAge, customAgeOp, lang = 'English') => {
+  const buildSearchString = useCallback((filterOps, customAge, customAgeOp, cpRange, cpRangeOp, lang = 'English') => {
     try {
       // Validate BEFORE building
       const validation = validateFilterOperators(filterOps, lang);
@@ -798,6 +804,17 @@ const PokemonGoSearchBuilder = () => {
           orFilters.push(ageValue);
         } else if (customAgeOp === 'NOT') {
           notFilters.push(ageValue);
+        }
+      }
+
+      // Handle CP range
+      if (cpRange && cpRange.trim()) {
+        if (cpRangeOp === 'AND') {
+          andFilters.push(cpRange);
+        } else if (cpRangeOp === 'OR') {
+          orFilters.push(cpRange);
+        } else if (cpRangeOp === 'NOT') {
+          notFilters.push(cpRange);
         }
       }
 
@@ -918,11 +935,13 @@ const PokemonGoSearchBuilder = () => {
         filterOperators,
         customAgeValue,
         customAgeOp,
+        cpRangeValue,
+        cpRangeOperator,
         selectedLanguage
       );
       setSearchString(newSearchString);
     }
-  }, [filterOperators, customAgeValue, customAgeIncluded, customAgeExcluded, selectedLanguage, isPremadeSearch, buildSearchString]);
+  }, [filterOperators, customAgeValue, customAgeIncluded, customAgeExcluded, cpRangeValue, cpRangeOperator, selectedLanguage, isPremadeSearch, buildSearchString]);
 
   // Run validation on filterOperators change
   useEffect(() => {
@@ -1045,6 +1064,8 @@ const PokemonGoSearchBuilder = () => {
     setCustomAgeValue('');
     setCustomAgeIncluded(false);
     setCustomAgeExcluded(false);
+    setCPRangeValue('');
+    setCPRangeOperator('AND');
     pokedexNumbersRef.current = ''; // Clear Pokedex numbers ref
   };
 
@@ -1081,6 +1102,8 @@ const PokemonGoSearchBuilder = () => {
       const newOperators = {};
       let customAgeFound = null;
       let customAgeOp = null;
+      let cpRangeFound = null;
+      let cpRangeOpFound = null;
       
       parts.forEach(part => {
         // Skip Pokedex numbers (all digits and commas)
@@ -1096,8 +1119,12 @@ const PokemonGoSearchBuilder = () => {
             // Check for NOT prefix
             if (value.startsWith('!')) {
               const cleanValue = value.substring(1);
-              // Check if it's custom age
-              if (cleanValue.startsWith('age')) {
+              // Check if it's CP range
+              if (/^cp[\d-]+$/.test(cleanValue)) {
+                cpRangeFound = cleanValue;
+                cpRangeOpFound = 'NOT';
+              } else if (cleanValue.startsWith('age')) {
+                // Check if it's custom age
                 const ageValue = cleanValue.substring(3);
                 customAgeFound = ageValue;
                 customAgeOp = 'NOT';
@@ -1108,8 +1135,12 @@ const PokemonGoSearchBuilder = () => {
                 }
               }
             } else {
-              // Check if it's custom age
-              if (value.startsWith('age')) {
+              // Check if it's CP range
+              if (/^cp[\d-]+$/.test(value)) {
+                cpRangeFound = value;
+                cpRangeOpFound = 'OR';
+              } else if (value.startsWith('age')) {
+                // Check if it's custom age
                 const ageValue = value.substring(3);
                 customAgeFound = ageValue;
                 customAgeOp = 'OR';
@@ -1126,8 +1157,12 @@ const PokemonGoSearchBuilder = () => {
           // Check for NOT prefix
           if (part.startsWith('!')) {
             const cleanValue = part.substring(1);
-            // Check if it's custom age
-            if (cleanValue.startsWith('age')) {
+            // Check if it's CP range
+            if (/^cp[\d-]+$/.test(cleanValue)) {
+              cpRangeFound = cleanValue;
+              cpRangeOpFound = 'NOT';
+            } else if (cleanValue.startsWith('age')) {
+              // Check if it's custom age
               const ageValue = cleanValue.substring(3);
               customAgeFound = ageValue;
               customAgeOp = 'NOT';
@@ -1138,8 +1173,12 @@ const PokemonGoSearchBuilder = () => {
               }
             }
           } else {
-            // Check if it's custom age
-            if (part.startsWith('age')) {
+            // Check if it's CP range
+            if (/^cp[\d-]+$/.test(part)) {
+              cpRangeFound = part;
+              cpRangeOpFound = 'AND';
+            } else if (part.startsWith('age')) {
+              // Check if it's custom age
               const ageValue = part.substring(3);
               customAgeFound = ageValue;
               customAgeOp = 'AND';
@@ -1168,6 +1207,19 @@ const PokemonGoSearchBuilder = () => {
           setCustomAgeIncluded(false);
           setCustomAgeExcluded(true);
         }
+      } else {
+        setCustomAgeValue('');
+        setCustomAgeIncluded(false);
+        setCustomAgeExcluded(false);
+      }
+
+      // Handle CP range
+      if (cpRangeFound !== null) {
+        setCPRangeValue(cpRangeFound);
+        setCPRangeOperator(cpRangeOpFound || 'AND');
+      } else {
+        setCPRangeValue('');
+        setCPRangeOperator('AND');
       }
     } catch (error) {
       console.error('Error parsing search string:', error);
@@ -1507,54 +1559,28 @@ const PokemonGoSearchBuilder = () => {
     }
   };
 
-  // Insert or replace CP range in search string
-  const insertCPRange = (cpRange) => {
+  // Generate CP range string from min/max values
+  const generateCPRange = (minCP, maxCP) => {
+    if (!minCP && !maxCP) return null;
+    
+    if (minCP && maxCP) {
+      return `cp${minCP}-${maxCP}`;
+    } else if (minCP) {
+      return `cp${minCP}-`;
+    } else if (maxCP) {
+      return `cp-${maxCP}`;
+    }
+    return null;
+  };
+
+  // Insert or replace CP range in search string with operator support
+  const insertCPRange = (cpRange, operator = 'AND') => {
+    if (!cpRange) return;
+    
     setIsPremadeSearch(false);
-    
-    // CP range is language-independent (starts with "cp"), so we can work with English version
-    const currentEnglish = selectedLanguage !== 'English' 
-      ? translateToEnglish(searchString, selectedLanguage) 
-      : searchString;
-    
-    if (!currentEnglish || currentEnglish.trim() === '') {
-      // If search string is empty, just set the CP range
-      setTranslatedSearchString(cpRange);
-      return;
-    }
-    
-    // Split by & to get parts
-    const parts = currentEnglish.split('&').map(p => p.trim()).filter(p => p);
-    
-    // Find existing CP range (starts with "cp" followed by numbers and hyphens)
-    let cpIndex = -1;
-    for (let i = 0; i < parts.length; i++) {
-      if (/^cp[\d\-]+$/.test(parts[i])) {
-        cpIndex = i;
-        break;
-      }
-    }
-    
-    // Replace existing CP range or insert new one
-    if (cpIndex >= 0) {
-      // Replace existing CP range
-      parts[cpIndex] = cpRange;
-    } else {
-      // Insert CP range (after Pokedex numbers if they exist, otherwise at the beginning)
-      let insertIndex = 0;
-      for (let i = 0; i < parts.length; i++) {
-        // Check if this part is Pokedex numbers (digits, commas, and hyphens for ranges)
-        if (/^[\d,\-]+$/.test(parts[i])) {
-          insertIndex = i + 1;
-          break;
-        }
-      }
-      parts.splice(insertIndex, 0, cpRange);
-    }
-    
-    const newEnglishString = parts.join('&');
-    setTranslatedSearchString(newEnglishString);
-    // Preserve any Pokedex numbers
-    extractPokedexNumbers(newEnglishString);
+    // Set CP range state - this will trigger buildSearchString via useEffect
+    setCPRangeValue(cpRange);
+    setCPRangeOperator(operator);
   };
 
   // Insert Pokemon numbers into search string
@@ -2252,7 +2278,7 @@ const PokemonGoSearchBuilder = () => {
       <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* Active Filter Chips - Compact Display */}
-        {(Object.keys(filterOperators).length > 0 || (customAgeValue && (customAgeIncluded || customAgeExcluded))) && (
+        {(Object.keys(filterOperators).length > 0 || (customAgeValue && (customAgeIncluded || customAgeExcluded)) || cpRangeValue) && (
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-slate-800">
             <div className="flex flex-wrap gap-2">
               {Object.entries(filterOperators).map(([filterId, operator]) => {
@@ -2316,6 +2342,39 @@ const PokemonGoSearchBuilder = () => {
                         setCustomAgeIncluded(false);
                         setCustomAgeExcluded(false);
                         setCustomAgeValue('');
+                        setRemovingChip(null);
+                      }, 300);
+                    }}
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {cpRangeValue && (
+                <div
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm
+                    border-2 transition-all
+                    ${cpRangeOperator === 'AND'
+                      ? (isDarkMode ? 'bg-blue-600 border-blue-500 text-blue-100' : 'bg-blue-100 border-blue-300 text-blue-800')
+                      : cpRangeOperator === 'OR'
+                      ? (isDarkMode ? 'bg-green-600 border-green-500 text-green-100' : 'bg-green-100 border-green-300 text-green-800')
+                      : (isDarkMode ? 'bg-red-600 border-red-500 text-red-100' : 'bg-red-100 border-red-300 text-red-800')
+                    }
+                    ${removingChip === 'cpRange' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}
+                  `}
+                >
+                  <span className="font-mono font-bold text-xs">
+                    {cpRangeOperator === 'AND' ? '&' : cpRangeOperator === 'OR' ? ',' : '!'}
+                  </span>
+                  <span>{cpRangeValue}</span>
+                  <button
+                    onClick={() => {
+                      setRemovingChip('cpRange');
+                      setTimeout(() => {
+                        setCPRangeValue('');
+                        setCPRangeOperator('AND');
                         setRemovingChip(null);
                       }, 300);
                     }}
@@ -2712,55 +2771,318 @@ const PokemonGoSearchBuilder = () => {
                   {getUIText('pvp_league_cp_caps_desc', selectedLanguage)}
                 </p>
               </div>
+
+              {/* Custom CP Range Input */}
+              <div className="mb-4 p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl border-2 border-violet-200 dark:border-violet-500/30">
+                <h4 className="text-sm font-bold text-violet-900 dark:text-violet-100 mb-3">Custom CP Range</h4>
+                
+                <div className="flex flex-col sm:flex-row gap-3 mb-3">
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-violet-800 dark:text-violet-200 mb-1">Min CP</label>
+                    <input
+                      type="text"
+                      value={customMinCP}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setCustomMinCP(value);
+                        setCPRangeError('');
+                      }}
+                      placeholder="e.g., 1500"
+                      className="w-full px-3 py-2 border-2 border-violet-300 dark:border-violet-600 rounded-lg focus:border-violet-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/40 focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-medium text-violet-800 dark:text-violet-200 mb-1">Max CP</label>
+                    <input
+                      type="text"
+                      value={customMaxCP}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9]/g, '');
+                        setCustomMaxCP(value);
+                        setCPRangeError('');
+                      }}
+                      placeholder="e.g., 1500"
+                      className="w-full px-3 py-2 border-2 border-violet-300 dark:border-violet-600 rounded-lg focus:border-violet-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/40 focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    />
+                  </div>
+                </div>
+
+                {cpRangeError && (
+                  <div className="mb-3 p-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+                    <p className="text-xs text-red-800 dark:text-red-200">{cpRangeError}</p>
+                  </div>
+                )}
+
+                {/* Operator Buttons */}
+                <div className="flex gap-2 mb-3">
+                  <button
+                    onClick={() => setCustomCPOperator('AND')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      customCPOperator === 'AND'
+                        ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                        : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-blue-700 border-2 border-blue-300 hover:bg-blue-50'
+                    }`}
+                  >
+                    AND (&)
+                  </button>
+                  <button
+                    onClick={() => setCustomCPOperator('OR')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      customCPOperator === 'OR'
+                        ? isDarkMode ? 'bg-green-600 text-white' : 'bg-green-500 text-white'
+                        : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-green-700 border-2 border-green-300 hover:bg-green-50'
+                    }`}
+                  >
+                    OR (,)
+                  </button>
+                  <button
+                    onClick={() => setCustomCPOperator('NOT')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      customCPOperator === 'NOT'
+                        ? isDarkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'
+                        : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-red-700 border-2 border-red-300 hover:bg-red-50'
+                    }`}
+                  >
+                    NOT (!)
+                  </button>
+                </div>
+
+                {/* Add Button */}
+                <button
+                  onClick={() => {
+                    // Validate inputs
+                    if (!customMinCP && !customMaxCP) {
+                      setCPRangeError('Please enter at least one CP value');
+                      return;
+                    }
+                    
+                    const min = customMinCP ? parseInt(customMinCP, 10) : null;
+                    const max = customMaxCP ? parseInt(customMaxCP, 10) : null;
+                    
+                    if (min !== null && max !== null && min > max) {
+                      setCPRangeError('Min CP cannot be greater than Max CP');
+                      return;
+                    }
+                    
+                    const cpRange = generateCPRange(customMinCP, customMaxCP);
+                    if (cpRange) {
+                      insertCPRange(cpRange, customCPOperator);
+                      setCustomMinCP('');
+                      setCustomMaxCP('');
+                      setCPRangeError('');
+                    }
+                  }}
+                  className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600 text-white font-semibold rounded-lg transition-colors text-sm"
+                >
+                  Add CP Range to Search
+                </button>
+              </div>
               
+              {/* Preset CP Range Buttons */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                <button
-                  onClick={() => insertCPRange('cp0-1500')}
-                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                >
-                  <div className="font-bold text-sm sm:text-base text-violet-800 mb-1">{getUIText('great_league', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-violet-600 font-mono">{getUIText('great_league_cp', selectedLanguage)}</div>
-                </button>
+                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 dark:border-violet-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                  <div className="font-bold text-sm sm:text-base text-violet-800 dark:text-violet-200 mb-1">{getUIText('great_league', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-violet-600 dark:text-violet-300 font-mono mb-2">{getUIText('great_league_cp', selectedLanguage)}</div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-1500', 'AND');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                    >
+                      AND
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-1500', 'OR');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    >
+                      OR
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-1500', 'NOT');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                    >
+                      NOT
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => insertCPRange('cp0-2500')}
-                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                >
-                  <div className="font-bold text-sm sm:text-base text-blue-800 mb-1">{getUIText('ultra_league', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-blue-600 font-mono">{getUIText('ultra_league_cp', selectedLanguage)}</div>
-                </button>
+                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 dark:border-blue-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                  <div className="font-bold text-sm sm:text-base text-blue-800 dark:text-blue-200 mb-1">{getUIText('ultra_league', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-300 font-mono mb-2">{getUIText('ultra_league_cp', selectedLanguage)}</div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-2500', 'AND');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                    >
+                      AND
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-2500', 'OR');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    >
+                      OR
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-2500', 'NOT');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                    >
+                      NOT
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => insertCPRange('cp2500-')}
-                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                >
-                  <div className="font-bold text-sm sm:text-base text-amber-800 mb-1">{getUIText('master_league', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-amber-600 font-mono">{getUIText('master_league_cp', selectedLanguage)}</div>
-                </button>
+                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 dark:border-amber-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                  <div className="font-bold text-sm sm:text-base text-amber-800 dark:text-amber-200 mb-1">{getUIText('master_league', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-300 font-mono mb-2">{getUIText('master_league_cp', selectedLanguage)}</div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp2500-', 'AND');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                    >
+                      AND
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp2500-', 'OR');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    >
+                      OR
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp2500-', 'NOT');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                    >
+                      NOT
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => insertCPRange('cp0-500')}
-                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                >
-                  <div className="font-bold text-sm sm:text-base text-green-800 mb-1">{getUIText('under_500_cp', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-green-600 font-mono">{getUIText('under_500_cp_value', selectedLanguage)}</div>
-                </button>
+                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 dark:border-green-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                  <div className="font-bold text-sm sm:text-base text-green-800 dark:text-green-200 mb-1">{getUIText('under_500_cp', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-green-600 dark:text-green-300 font-mono mb-2">{getUIText('under_500_cp_value', selectedLanguage)}</div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-500', 'AND');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                    >
+                      AND
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-500', 'OR');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    >
+                      OR
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp-500', 'NOT');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                    >
+                      NOT
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => insertCPRange('cp3000-')}
-                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                >
-                  <div className="font-bold text-sm sm:text-base text-orange-800 mb-1">{getUIText('high_cp', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-orange-600 font-mono">{getUIText('high_cp_value', selectedLanguage)}</div>
-                </button>
+                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 dark:from-orange-900/30 dark:to-red-900/30 dark:border-orange-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                  <div className="font-bold text-sm sm:text-base text-orange-800 dark:text-orange-200 mb-1">{getUIText('high_cp', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-300 font-mono mb-2">{getUIText('high_cp_value', selectedLanguage)}</div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp3000-', 'AND');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                    >
+                      AND
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp3000-', 'OR');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    >
+                      OR
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp3000-', 'NOT');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                    >
+                      NOT
+                    </button>
+                  </div>
+                </div>
 
-                <button
-                  onClick={() => insertCPRange('cp4000-')}
-                  className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
-                >
-                  <div className="font-bold text-sm sm:text-base text-red-800 mb-1">{getUIText('perfect_cp', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-red-600 font-mono">{getUIText('perfect_cp_value', selectedLanguage)}</div>
-                </button>
+                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 dark:border-red-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                  <div className="font-bold text-sm sm:text-base text-red-800 dark:text-red-200 mb-1">{getUIText('perfect_cp', selectedLanguage)}</div>
+                  <div className="text-[10px] sm:text-xs text-red-600 dark:text-red-300 font-mono mb-2">{getUIText('perfect_cp_value', selectedLanguage)}</div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp4000-', 'AND');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                    >
+                      AND
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp4000-', 'OR');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                    >
+                      OR
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        insertCPRange('cp4000-', 'NOT');
+                      }}
+                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                    >
+                      NOT
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
