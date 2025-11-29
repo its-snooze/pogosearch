@@ -509,7 +509,7 @@ const PokemonGoSearchBuilder = () => {
   }, []);
 
   // Validate filter operators based on Pokemon GO search logic
-  const validateFilterOperators = useCallback((filterOps) => {
+  const validateFilterOperators = useCallback((filterOps, language = 'English') => {
     const errors = [];
     const warnings = [];
 
@@ -536,26 +536,29 @@ const PokemonGoSearchBuilder = () => {
     const andHPs = andFilters.filter(id => hpStats.includes(id));
 
     if (andAttacks.length > 1) {
+      const filtersStr = andAttacks.join(' & ');
       errors.push({
-        issue: `Cannot use AND with multiple Attack IVs (${andAttacks.join(' & ')})`,
-        why: `A Pokémon can only have ONE Attack IV value. You're asking for ${andAttacks.join(' AND ')} simultaneously.`,
-        fix: `Change to OR: ${andAttacks.join(',')} - this will show Pokémon with ANY of these Attack values.`
+        issue: getUIText('validation_error_multiple_attack_ivs', language).replace('{filters}', filtersStr),
+        why: getUIText('validation_error_multiple_attack_ivs_why', language).replace('{filters}', andAttacks.join(' AND ')),
+        fix: getUIText('validation_error_multiple_attack_ivs_fix', language).replace('{filters}', andAttacks.join(','))
       });
     }
 
     if (andDefenses.length > 1) {
+      const filtersStr = andDefenses.join(' & ');
       errors.push({
-        issue: `Cannot use AND with multiple Defense IVs (${andDefenses.join(' & ')})`,
-        why: `A Pokémon can only have ONE Defense IV value. You're asking for ${andDefenses.join(' AND ')} simultaneously.`,
-        fix: `Change to OR: ${andDefenses.join(',')} - this will show Pokémon with ANY of these Defense values.`
+        issue: getUIText('validation_error_multiple_defense_ivs', language).replace('{filters}', filtersStr),
+        why: getUIText('validation_error_multiple_defense_ivs_why', language).replace('{filters}', andDefenses.join(' AND ')),
+        fix: getUIText('validation_error_multiple_defense_ivs_fix', language).replace('{filters}', andDefenses.join(','))
       });
     }
 
     if (andHPs.length > 1) {
+      const filtersStr = andHPs.join(' & ');
       errors.push({
-        issue: `Cannot use AND with multiple HP IVs (${andHPs.join(' & ')})`,
-        why: `A Pokémon can only have ONE HP IV value. You're asking for ${andHPs.join(' AND ')} simultaneously.`,
-        fix: `Change to OR: ${andHPs.join(',')} - this will show Pokémon with ANY of these HP values.`
+        issue: getUIText('validation_error_multiple_hp_ivs', language).replace('{filters}', filtersStr),
+        why: getUIText('validation_error_multiple_hp_ivs_why', language).replace('{filters}', andHPs.join(' AND ')),
+        fix: getUIText('validation_error_multiple_hp_ivs_fix', language).replace('{filters}', andHPs.join(','))
       });
     }
 
@@ -564,10 +567,11 @@ const PokemonGoSearchBuilder = () => {
     const andStars = andFilters.filter(id => starRatings.includes(id));
 
     if (andStars.length > 1) {
+      const filtersStr = andStars.join(' & ');
       errors.push({
-        issue: `Cannot use AND with multiple star ratings (${andStars.join(' & ')})`,
-        why: `A Pokémon has ONE star rating based on total IVs. It cannot be ${andStars.join(' AND ')} simultaneously.`,
-        fix: `Change to OR: ${andStars.join(',')} - this will show Pokémon with ANY of these star ratings.`
+        issue: getUIText('validation_error_multiple_star_ratings', language).replace('{filters}', filtersStr),
+        why: getUIText('validation_error_multiple_star_ratings_why', language).replace('{filters}', andStars.join(' AND ')),
+        fix: getUIText('validation_error_multiple_star_ratings_fix', language).replace('{filters}', andStars.join(','))
       });
     }
 
@@ -577,9 +581,9 @@ const PokemonGoSearchBuilder = () => {
 
     if (hasShadowAnd && hasPurifiedAnd) {
       errors.push({
-        issue: `Shadow AND Purified`,
-        why: `A Pokémon cannot be both Shadow AND Purified. Once purified, it's no longer shadow.`,
-        fix: `Change to OR: shadow,purified - this will show Pokémon that are EITHER shadow OR purified.`
+        issue: getUIText('validation_error_shadow_and_purified', language),
+        why: getUIText('validation_error_shadow_and_purified_why', language),
+        fix: getUIText('validation_error_shadow_and_purified_fix', language)
       });
     }
 
@@ -591,10 +595,12 @@ const PokemonGoSearchBuilder = () => {
       const conflicts = andFilters.filter(id => nonPerfectIVs.includes(id));
 
       if (conflicts.length > 0) {
+        const filtersStr = conflicts.join(', ');
+        const nonperfectStr = conflicts.map(c => c.includes('3') ? '12-14' : '0').join(' or ');
         errors.push({
-          issue: `4★ with non-perfect IVs (${conflicts.join(', ')})`,
-          why: `4★ means 15/15/15 (all perfect stats). Cannot have ${conflicts.map(c => c.includes('3') ? '12-14' : '0').join(' or ')} when requiring perfect stats.`,
-          fix: `Remove 4★, or remove ${conflicts.join(', ')}, or change 4★ to OR if you want either perfect OR non-perfect.`
+          issue: getUIText('validation_error_4star_with_nonperfect', language).replace('{filters}', filtersStr),
+          why: getUIText('validation_error_4star_with_nonperfect_why', language).replace('{nonperfect}', nonperfectStr),
+          fix: getUIText('validation_error_4star_with_nonperfect_fix', language).replace('{filters}', filtersStr)
         });
       }
     }
@@ -607,9 +613,9 @@ const PokemonGoSearchBuilder = () => {
 
     if (hasPerfectAttack && hasPerfectDefense && hasPerfectHP && excludes4Star) {
       errors.push({
-        issue: `Requiring perfect Attack, Defense, and HP but excluding 4★`,
-        why: `15/15/15 IS a 4★ (perfect) Pokémon. You cannot have all perfect stats and NOT be 4★.`,
-        fix: `Remove NOT 4★, or remove one of the perfect stat requirements.`
+        issue: getUIText('validation_error_perfect_stats_exclude_4star', language),
+        why: getUIText('validation_error_perfect_stats_exclude_4star_why', language),
+        fix: getUIText('validation_error_perfect_stats_exclude_4star_fix', language)
       });
     }
 
@@ -621,10 +627,11 @@ const PokemonGoSearchBuilder = () => {
       const conflicts = andFilters.filter(id => highIVs.includes(id));
 
       if (conflicts.length > 0) {
+        const filtersStr = conflicts.join(', ');
         errors.push({
-          issue: `0★ with high IVs (${conflicts.join(', ')})`,
-          why: `0★ means 0-49% total IVs (0-22 stat points). High IVs like ${conflicts.join(', ')} would push it above 0★.`,
-          fix: `Change 0★ to a higher star rating, or remove the high IV filters, or use OR instead of AND.`
+          issue: getUIText('validation_error_0star_with_high_ivs', language).replace('{filters}', filtersStr),
+          why: getUIText('validation_error_0star_with_high_ivs_why', language).replace('{filters}', filtersStr),
+          fix: getUIText('validation_error_0star_with_high_ivs_fix', language).replace('{filters}', filtersStr)
         });
       }
     }
@@ -647,10 +654,11 @@ const PokemonGoSearchBuilder = () => {
       const zeroIVs = ['0attack', '0defense', '0hp'].filter(id => andFilters.includes(id));
 
       if (zeroIVs.length >= 2) {
+        const filtersStr = zeroIVs.join(', ');
         errors.push({
-          issue: `3★ with ${zeroIVs.length} zero IVs (${zeroIVs.join(', ')})`,
-          why: `3★ requires 37-44 total stat points (82-98%). Having 2+ stats at 0 makes this mathematically impossible.`,
-          fix: `Remove 3★, or remove the zero IV filters, or change to 1★ or 0★.`
+          issue: getUIText('validation_error_3star_with_zero_ivs', language).replace('{count}', zeroIVs.length).replace('{filters}', filtersStr),
+          why: getUIText('validation_error_3star_with_zero_ivs_why', language),
+          fix: getUIText('validation_error_3star_with_zero_ivs_fix', language).replace('{filters}', filtersStr)
         });
       }
     }
@@ -662,10 +670,11 @@ const PokemonGoSearchBuilder = () => {
       const zeroIVs = ['0attack', '0defense', '0hp'].filter(id => andFilters.includes(id));
 
       if (zeroIVs.length >= 2) {
+        const filtersStr = zeroIVs.join(', ');
         errors.push({
-          issue: `2★ with 2+ zero IVs (${zeroIVs.join(', ')})`,
-          why: `2★ requires 30-36 total stat points. With 2 stats at 0, you'd need the third at 30+ which is impossible (max is 15).`,
-          fix: `Remove 2★, or remove the zero IV filters, or change to 0★ or 1★.`
+          issue: getUIText('validation_error_2star_with_zero_ivs', language).replace('{filters}', filtersStr),
+          why: getUIText('validation_error_2star_with_zero_ivs_why', language),
+          fix: getUIText('validation_error_2star_with_zero_ivs_fix', language).replace('{filters}', filtersStr)
         });
       }
     }
@@ -680,9 +689,9 @@ const PokemonGoSearchBuilder = () => {
 
       if (hasPerfectAttack && hasPerfectDefense && hasPerfectHP) {
         errors.push({
-          issue: `3★ with all perfect IVs (4attack, 4defense, 4hp)`,
-          why: `3★ means 82-98% total IVs (37-44 stat points). Three perfect stats = 45 points, which is 4★ (100%), not 3★.`,
-          fix: `Change 3★ to 4★, or remove one of the perfect IV requirements.`
+          issue: getUIText('validation_error_3star_with_all_perfect', language),
+          why: getUIText('validation_error_3star_with_all_perfect_why', language),
+          fix: getUIText('validation_error_3star_with_all_perfect_fix', language)
         });
       }
     }
@@ -706,7 +715,7 @@ const PokemonGoSearchBuilder = () => {
   const buildSearchString = useCallback((filterOps, customAge, customAgeOp, lang = 'English') => {
     try {
       // Validate BEFORE building
-      const validation = validateFilterOperators(filterOps);
+      const validation = validateFilterOperators(filterOps, lang);
       setValidationResult(validation);
       console.log('Validation in buildSearchString:', validation); // DEBUG
 
@@ -867,10 +876,10 @@ const PokemonGoSearchBuilder = () => {
   // Run validation on filterOperators change
   useEffect(() => {
     console.log('Running validation with filterOperators:', filterOperators); // DEBUG
-    const result = validateFilterOperators(filterOperators);
+    const result = validateFilterOperators(filterOperators, selectedLanguage);
     console.log('Setting validation result:', result); // DEBUG
     setValidationResult(result);
-  }, [filterOperators, validateFilterOperators]);
+  }, [filterOperators, validateFilterOperators, selectedLanguage]);
 
   // Validate search string whenever it changes (for syntax errors)
   // Note: This is separate from filterOperators validation which handles logic errors
@@ -2764,7 +2773,7 @@ const PokemonGoSearchBuilder = () => {
           >
             <div className="flex items-center gap-2">
               <Search size={18} className={isDarkMode ? 'text-blue-400' : 'text-blue-600'} />
-              <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-100">How to use the filter buttons</h3>
+              <h3 className="font-semibold text-sm text-gray-800 dark:text-slate-100">{getUIText('how_to_use_filter_buttons', selectedLanguage)}</h3>
             </div>
             <ChevronDown 
               size={20} 
@@ -2777,35 +2786,35 @@ const PokemonGoSearchBuilder = () => {
               <div className="space-y-2 text-xs">
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1.5 rounded bg-blue-500 text-white font-bold min-w-[70px] text-center flex flex-col items-center">
-                    <span className="text-xs">AND</span>
-                    <span className="font-mono text-[10px] opacity-70">&</span>
+                    <span className="text-xs">{getUIText('operator_and_title', selectedLanguage)}</span>
+                    <span className="font-mono text-[10px] opacity-70">{getUIText('operator_and_symbol', selectedLanguage)}</span>
                   </span>
                   <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                    Must have this filter - combines with other AND filters (Example: Shiny AND Legendary shows only shiny legendaries)
+                    {getUIText('operator_and_description', selectedLanguage)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1.5 rounded bg-green-500 text-white font-bold min-w-[70px] text-center flex flex-col items-center">
-                    <span className="text-xs">OR</span>
-                    <span className="font-mono text-[10px] opacity-70">,</span>
+                    <span className="text-xs">{getUIText('operator_or_title', selectedLanguage)}</span>
+                    <span className="font-mono text-[10px] opacity-70">{getUIText('operator_or_symbol', selectedLanguage)}</span>
                   </span>
                   <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                    Can have any of these - shows alternatives (Example: 4★ OR 3★ shows all 3-star and 4-star Pokémon)
+                    {getUIText('operator_or_description', selectedLanguage)}
                   </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="px-3 py-1.5 rounded bg-red-500 text-white font-bold min-w-[70px] text-center flex flex-col items-center">
-                    <span className="text-xs">NOT</span>
-                    <span className="font-mono text-[10px] opacity-70">!</span>
+                    <span className="text-xs">{getUIText('operator_not_title', selectedLanguage)}</span>
+                    <span className="font-mono text-[10px] opacity-70">{getUIText('operator_not_symbol', selectedLanguage)}</span>
                   </span>
                   <span className={isDarkMode ? 'text-gray-300' : 'text-gray-700'}>
-                    Exclude this filter - hides matching Pokémon (Example: NOT Shadow excludes all shadow Pokémon)
+                    {getUIText('operator_not_description', selectedLanguage)}
                   </span>
                 </div>
               </div>
               <div className={`mt-3 pt-3 border-t ${isDarkMode ? 'border-gray-700' : 'border-blue-300'}`}>
                 <p className={`text-xs italic ${isDarkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                  💡 Tip: You can combine operators! Try "4★ AND Legendary OR Mythical AND NOT Shadow" to find perfect IV legendaries/mythicals that aren't shadow.
+                  {getUIText('operator_tip', selectedLanguage)}
                 </p>
               </div>
             </div>
