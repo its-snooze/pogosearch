@@ -1,15 +1,15 @@
 {
   "files": {
     "main.css": "/pogosearch/static/css/main.38773983.css",
-    "main.js": "/pogosearch/static/js/main.b8f0cc0c.js",
+    "main.js": "/pogosearch/static/js/main.dc660453.js",
     "static/js/453.c673994c.chunk.js": "/pogosearch/static/js/453.c673994c.chunk.js",
     "index.html": "/pogosearch/index.html",
     "main.38773983.css.map": "/pogosearch/static/css/main.38773983.css.map",
-    "main.b8f0cc0c.js.map": "/pogosearch/static/js/main.b8f0cc0c.js.map",
+    "main.dc660453.js.map": "/pogosearch/static/js/main.dc660453.js.map",
     "453.c673994c.chunk.js.map": "/pogosearch/static/js/453.c673994c.chunk.js.map"
   },
   "entrypoints": [
     "static/css/main.38773983.css",
-    "static/js/main.b8f0cc0c.js"
+    "static/js/main.dc660453.js"
   ]
 }
