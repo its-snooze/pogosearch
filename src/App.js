@@ -508,6 +508,195 @@ const PokemonGoSearchBuilder = () => {
       .find(f => f.id === id);
   }, []);
 
+  // Validate filter operators based on Pokemon GO search logic
+  const validateFilterOperators = useCallback((filterOps) => {
+    const errors = [];
+    const warnings = [];
+
+    // Group by operator type
+    const andFilters = Object.entries(filterOps)
+      .filter(([_, op]) => op === 'AND')
+      .map(([id]) => id);
+    const orFilters = Object.entries(filterOps)
+      .filter(([_, op]) => op === 'OR')
+      .map(([id]) => id);
+    const notFilters = Object.entries(filterOps)
+      .filter(([_, op]) => op === 'NOT')
+      .map(([id]) => id);
+
+    console.log('Validation check:', { andFilters, orFilters, notFilters }); // DEBUG
+
+    // RULE 1: Same stat with different values using AND
+    const attackStats = ['4attack', '3attack', '0attack'];
+    const defenseStats = ['4defense', '3defense', '0defense'];
+    const hpStats = ['4hp', '3hp', '0hp'];
+
+    const andAttacks = andFilters.filter(id => attackStats.includes(id));
+    const andDefenses = andFilters.filter(id => defenseStats.includes(id));
+    const andHPs = andFilters.filter(id => hpStats.includes(id));
+
+    if (andAttacks.length > 1) {
+      errors.push({
+        issue: `Cannot use AND with multiple Attack IVs (${andAttacks.join(' & ')})`,
+        why: `A Pokémon can only have ONE Attack IV value. You're asking for ${andAttacks.join(' AND ')} simultaneously.`,
+        fix: `Change to OR: ${andAttacks.join(',')} - this will show Pokémon with ANY of these Attack values.`
+      });
+    }
+
+    if (andDefenses.length > 1) {
+      errors.push({
+        issue: `Cannot use AND with multiple Defense IVs (${andDefenses.join(' & ')})`,
+        why: `A Pokémon can only have ONE Defense IV value. You're asking for ${andDefenses.join(' AND ')} simultaneously.`,
+        fix: `Change to OR: ${andDefenses.join(',')} - this will show Pokémon with ANY of these Defense values.`
+      });
+    }
+
+    if (andHPs.length > 1) {
+      errors.push({
+        issue: `Cannot use AND with multiple HP IVs (${andHPs.join(' & ')})`,
+        why: `A Pokémon can only have ONE HP IV value. You're asking for ${andHPs.join(' AND ')} simultaneously.`,
+        fix: `Change to OR: ${andHPs.join(',')} - this will show Pokémon with ANY of these HP values.`
+      });
+    }
+
+    // RULE 2: Multiple star ratings with AND
+    const starRatings = ['4*', '3*', '2*', '1*', '0*'];
+    const andStars = andFilters.filter(id => starRatings.includes(id));
+
+    if (andStars.length > 1) {
+      errors.push({
+        issue: `Cannot use AND with multiple star ratings (${andStars.join(' & ')})`,
+        why: `A Pokémon has ONE star rating based on total IVs. It cannot be ${andStars.join(' AND ')} simultaneously.`,
+        fix: `Change to OR: ${andStars.join(',')} - this will show Pokémon with ANY of these star ratings.`
+      });
+    }
+
+    // RULE 3: Shadow AND Purified (IMPOSSIBLE)
+    const hasShadowAnd = andFilters.includes('shadow');
+    const hasPurifiedAnd = andFilters.includes('purified');
+
+    if (hasShadowAnd && hasPurifiedAnd) {
+      errors.push({
+        issue: `Shadow AND Purified`,
+        why: `A Pokémon cannot be both Shadow AND Purified. Once purified, it's no longer shadow.`,
+        fix: `Change to OR: shadow,purified - this will show Pokémon that are EITHER shadow OR purified.`
+      });
+    }
+
+    // RULE 4: 4★ with non-perfect IVs (IMPOSSIBLE)
+    const has4StarAnd = andFilters.includes('4*');
+
+    if (has4StarAnd) {
+      const nonPerfectIVs = ['3attack', '0attack', '3defense', '0defense', '3hp', '0hp'];
+      const conflicts = andFilters.filter(id => nonPerfectIVs.includes(id));
+
+      if (conflicts.length > 0) {
+        errors.push({
+          issue: `4★ with non-perfect IVs (${conflicts.join(', ')})`,
+          why: `4★ means 15/15/15 (all perfect stats). Cannot have ${conflicts.map(c => c.includes('3') ? '12-14' : '0').join(' or ')} when requiring perfect stats.`,
+          fix: `Remove 4★, or remove ${conflicts.join(', ')}, or change 4★ to OR if you want either perfect OR non-perfect.`
+        });
+      }
+    }
+
+    // RULE 5: Perfect stats excluding 4★ (IMPOSSIBLE)
+    const hasPerfectAttack = andFilters.includes('4attack');
+    const hasPerfectDefense = andFilters.includes('4defense');
+    const hasPerfectHP = andFilters.includes('4hp');
+    const excludes4Star = notFilters.includes('4*');
+
+    if (hasPerfectAttack && hasPerfectDefense && hasPerfectHP && excludes4Star) {
+      errors.push({
+        issue: `Requiring perfect Attack, Defense, and HP but excluding 4★`,
+        why: `15/15/15 IS a 4★ (perfect) Pokémon. You cannot have all perfect stats and NOT be 4★.`,
+        fix: `Remove NOT 4★, or remove one of the perfect stat requirements.`
+      });
+    }
+
+    // RULE 6: 0★ with high IVs (IMPOSSIBLE)
+    const has0StarAnd = andFilters.includes('0*');
+
+    if (has0StarAnd) {
+      const highIVs = ['4attack', '3attack', '4defense', '3defense', '4hp', '3hp'];
+      const conflicts = andFilters.filter(id => highIVs.includes(id));
+
+      if (conflicts.length > 0) {
+        errors.push({
+          issue: `0★ with high IVs (${conflicts.join(', ')})`,
+          why: `0★ means 0-49% total IVs (0-22 stat points). High IVs like ${conflicts.join(', ')} would push it above 0★.`,
+          fix: `Change 0★ to a higher star rating, or remove the high IV filters, or use OR instead of AND.`
+        });
+      }
+    }
+
+    // RULE 7: Mega AND Shadow (WARNING - returns zero results)
+    const hasMegaAnd = andFilters.includes('mega') || andFilters.includes('megaevolve');
+
+    if (hasMegaAnd && hasShadowAnd) {
+      warnings.push({
+        issue: `Mega AND Shadow`,
+        why: `Currently, Shadow Pokémon cannot Mega Evolve in Pokémon GO.`,
+        suggestion: `This search will return zero results. Consider using OR instead if you want either.`
+      });
+    }
+
+    // RULE 8: 3★ with multiple zero IVs (IMPOSSIBLE)
+    const has3StarAnd = andFilters.includes('3*');
+
+    if (has3StarAnd) {
+      const zeroIVs = ['0attack', '0defense', '0hp'].filter(id => andFilters.includes(id));
+
+      if (zeroIVs.length >= 2) {
+        errors.push({
+          issue: `3★ with ${zeroIVs.length} zero IVs (${zeroIVs.join(', ')})`,
+          why: `3★ requires 37-44 total stat points (82-98%). Having 2+ stats at 0 makes this mathematically impossible.`,
+          fix: `Remove 3★, or remove the zero IV filters, or change to 1★ or 0★.`
+        });
+      }
+    }
+
+    // RULE 9: 2★ with multiple zero IVs (IMPOSSIBLE)
+    const has2StarAnd = andFilters.includes('2*');
+
+    if (has2StarAnd) {
+      const zeroIVs = ['0attack', '0defense', '0hp'].filter(id => andFilters.includes(id));
+
+      if (zeroIVs.length >= 2) {
+        errors.push({
+          issue: `2★ with 2+ zero IVs (${zeroIVs.join(', ')})`,
+          why: `2★ requires 30-36 total stat points. With 2 stats at 0, you'd need the third at 30+ which is impossible (max is 15).`,
+          fix: `Remove 2★, or remove the zero IV filters, or change to 0★ or 1★.`
+        });
+      }
+    }
+
+    // RULE 10: 3★ with all perfect IVs (IMPOSSIBLE)
+    const has3StarPerfectIVs = andFilters.includes('3*');
+
+    if (has3StarPerfectIVs) {
+      const hasPerfectAttack = andFilters.includes('4attack');
+      const hasPerfectDefense = andFilters.includes('4defense');
+      const hasPerfectHP = andFilters.includes('4hp');
+
+      if (hasPerfectAttack && hasPerfectDefense && hasPerfectHP) {
+        errors.push({
+          issue: `3★ with all perfect IVs (4attack, 4defense, 4hp)`,
+          why: `3★ means 82-98% total IVs (37-44 stat points). Three perfect stats = 45 points, which is 4★ (100%), not 3★.`,
+          fix: `Change 3★ to 4★, or remove one of the perfect IV requirements.`
+        });
+      }
+    }
+
+    console.log('Validation result:', { valid: errors.length === 0, errors, warnings }); // DEBUG
+
+    return {
+      valid: errors.length === 0,
+      hasWarnings: warnings.length > 0,
+      errors,
+      warnings
+    };
+  }, []);
+
   // Build search string from filter operators
   // Follows Pokemon GO syntax rules:
   // - & (AND) = Must have ALL conditions
@@ -516,6 +705,11 @@ const PokemonGoSearchBuilder = () => {
   // - Operator precedence: NOT > AND > OR (commas distribute over &)
   const buildSearchString = useCallback((filterOps, customAge, customAgeOp, lang = 'English') => {
     try {
+      // Validate BEFORE building
+      const validation = validateFilterOperators(filterOps);
+      setValidationResult(validation);
+      console.log('Validation in buildSearchString:', validation); // DEBUG
+
       // Group filters by operator type
       const andFilters = [];
       const orFilters = [];
@@ -588,10 +782,6 @@ const PokemonGoSearchBuilder = () => {
       // CRITICAL: Use & to separate different sections
       let result = parts.filter(p => p && p.trim()).join('&');
 
-      // Validate
-      const validation = validateFilterOperators(filterOps);
-      setValidationResult(validation);
-
       // Translate if needed
       if (lang !== 'English' && result) {
         const translationResult = translateSearchString(result, lang, true);
@@ -617,210 +807,6 @@ const PokemonGoSearchBuilder = () => {
       return '';
     }
   }, [getFilterObject, validateFilterOperators]);
-
-  // Validate filter operators based on Pokemon GO search logic
-  const validateFilterOperators = useCallback((filterOps) => {
-    const errors = [];
-    const warnings = [];
-
-    // Group by operator type
-    const andFilters = Object.entries(filterOps).filter(([_, op]) => op === 'AND').map(([id]) => id);
-    const orFilters = Object.entries(filterOps).filter(([_, op]) => op === 'OR').map(([id]) => id);
-    const notFilters = Object.entries(filterOps).filter(([_, op]) => op === 'NOT').map(([id]) => id);
-
-    // RULE 1: Same stat with different values using AND (IMPOSSIBLE)
-    const checkStatConflict = (stats, statName) => {
-      const andStats = andFilters.filter(id => stats.includes(id));
-      if (andStats.length > 1) {
-        const statValues = andStats.map(id => {
-          if (id.startsWith('4')) return '15 (perfect)';
-          if (id.startsWith('3')) return '12-14 (high)';
-          if (id.startsWith('0')) return '0 (zero)';
-          return '';
-        }).filter(Boolean);
-        errors.push({
-          issue: `Cannot use AND with multiple ${statName} IVs (${andStats.join(' & ')})`,
-          why: `A Pokémon can only have ONE ${statName} IV value. You're asking for ${statName} to be ${statValues.join(' AND ')} at the same time.`,
-          fix: `Change to OR: ${andStats.join(',')} - this will show Pokémon with ANY of these ${statName} values.`
-        });
-      }
-    };
-
-    checkStatConflict(['4attack', '3attack', '0attack'], 'Attack');
-    checkStatConflict(['4defense', '3defense', '0defense'], 'Defense');
-    checkStatConflict(['4hp', '3hp', '0hp'], 'HP');
-
-    // RULE 2: Multiple star ratings with AND (IMPOSSIBLE)
-    const starRatings = ['4*', '3*', '2*', '1*', '0*'];
-    const andStars = andFilters.filter(id => starRatings.includes(id));
-    if (andStars.length > 1) {
-      errors.push({
-        issue: `Cannot use AND with multiple star ratings (${andStars.join(' & ')})`,
-        why: `A Pokémon has ONE star rating based on total IVs. It cannot be ${andStars.join(' AND ')} simultaneously.`,
-        fix: `Change to OR: ${andStars.join(',')} - this will show Pokémon with ANY of these star ratings.`
-      });
-    }
-
-    // RULE 3: 4★ conflicts with non-perfect IVs (IMPOSSIBLE)
-    if (andFilters.includes('4*')) {
-      const conflictingIVs = ['3attack', '0attack', '3defense', '0defense', '3hp', '0hp'];
-      const conflicts = andFilters.filter(id => conflictingIVs.includes(id));
-      if (conflicts.length > 0) {
-        errors.push({
-          issue: `4★ with non-perfect IVs (${conflicts.join(', ')})`,
-          why: `4★ means 15/15/15 (all perfect). Cannot have ${conflicts.map(c => c.includes('3') ? '12-14' : '0').join(' or ')} when requiring perfect stats.`,
-          fix: `Remove 4★, or remove ${conflicts.join(', ')}, or change 4★ to OR if you want either perfect OR non-perfect.`
-        });
-      }
-    }
-
-    // RULE 4: Perfect stats combination excluding 4★ (IMPOSSIBLE)
-    const hasPerfectAttack = andFilters.includes('4attack');
-    const hasPerfectDefense = andFilters.includes('4defense');
-    const hasPerfectHP = andFilters.includes('4hp');
-    const excludes4Star = notFilters.includes('4*');
-
-    if (hasPerfectAttack && hasPerfectDefense && hasPerfectHP && excludes4Star) {
-      errors.push({
-        issue: `Requiring perfect Attack, Defense, and HP but excluding 4★`,
-        why: `15/15/15 IS a 4★ (perfect) Pokémon. You cannot have all perfect stats and NOT be 4★.`,
-        fix: `Remove NOT 4★, or remove one of the perfect stat requirements.`
-      });
-    }
-
-    // RULE 5: 0★ with high IVs (IMPOSSIBLE)
-    if (andFilters.includes('0*')) {
-      const highIVs = ['4attack', '3attack', '4defense', '3defense', '4hp', '3hp'];
-      const conflicts = andFilters.filter(id => highIVs.includes(id));
-      if (conflicts.length > 0) {
-        errors.push({
-          issue: `0★ with high IVs (${conflicts.join(', ')})`,
-          why: `0★ means 0-49% total IVs (0-22 stat points). High IVs like ${conflicts.join(', ')} would push it above 0★.`,
-          fix: `Change 0★ to a higher star rating, or remove the high IV filters, or use OR instead of AND.`
-        });
-      }
-    }
-
-    // RULE 6: Shadow AND Purified (IMPOSSIBLE)
-    if (andFilters.includes('shadow') && andFilters.includes('purified')) {
-      errors.push({
-        issue: `Shadow AND Purified`,
-        why: `A Pokémon cannot be both Shadow AND Purified. Once purified, it's no longer shadow.`,
-        fix: `Change to OR: shadow,purified - this will show Pokémon that are EITHER shadow OR purified.`
-      });
-    }
-
-    // RULE 7: Excluding all star ratings (USELESS but not invalid)
-    const notStars = notFilters.filter(id => starRatings.includes(id));
-    if (notStars.length === 5) {
-      warnings.push({
-        issue: `Excluding ALL star ratings (NOT 4★, 3★, 2★, 1★, 0★)`,
-        why: `This will return zero results since every Pokémon has a star rating.`,
-        suggestion: `Remove some of the NOT filters to allow some star ratings through.`
-      });
-    }
-
-    // RULE 8: Two perfect stats excluding 4★ (WORKS but narrow)
-    if (excludes4Star) {
-      const perfectStats = ['4attack', '4defense', '4hp'].filter(id => andFilters.includes(id));
-      if (perfectStats.length === 2) {
-        warnings.push({
-          issue: `Two perfect IVs (${perfectStats.join(', ')}) while excluding 4★`,
-          why: `This is valid but VERY specific. Only shows Pokémon with 2 perfect stats and the third stat at 0-14.`,
-          suggestion: `This is a narrow search - you might not find many results.`
-        });
-      }
-    }
-
-    // RULE 9: 3★ with multiple zero IVs (VERY UNLIKELY but technically possible)
-    if (andFilters.includes('3*')) {
-      const zeroIVs = ['0attack', '0defense', '0hp'].filter(id => andFilters.includes(id));
-      if (zeroIVs.length >= 2) {
-        errors.push({
-          issue: `3★ with ${zeroIVs.length} zero IVs (${zeroIVs.join(', ')})`,
-          why: `3★ requires 37-44 total stat points (82-98%). Having 2+ stats at 0 makes this mathematically impossible.`,
-          fix: `Remove 3★, or remove the zero IV filters, or change to 1★ or 0★.`
-        });
-      }
-    }
-
-    // RULE 10: 2★ with zero attack AND zero defense (UNLIKELY)
-    if (andFilters.includes('2*')) {
-      const hasZeroAttack = andFilters.includes('0attack');
-      const hasZeroDefense = andFilters.includes('0defense');
-      const hasZeroHP = andFilters.includes('0hp');
-      const zeroCount = [hasZeroAttack, hasZeroDefense, hasZeroHP].filter(Boolean).length;
-
-      if (zeroCount >= 2) {
-        errors.push({
-          issue: `2★ with 2+ zero IVs`,
-          why: `2★ requires 30-36 total stat points. With 2 stats at 0, you'd need the third at 30+ which is impossible (max is 15).`,
-          fix: `Remove 2★, or remove the zero IV filters, or change to 0★ or 1★.`
-        });
-      }
-    }
-
-    // RULE 11: Perfect IV with NOT perfect star (IMPOSSIBLE)
-    if (notFilters.includes('4*')) {
-      const hasPerfectAttack = andFilters.includes('4attack');
-      const hasPerfectDefense = andFilters.includes('4defense');
-      const hasPerfectHP = andFilters.includes('4hp');
-
-      // Already covered by RULE 4, but add warning for 1 or 2 perfect stats
-      const perfectCount = [hasPerfectAttack, hasPerfectDefense, hasPerfectHP].filter(Boolean).length;
-      if (perfectCount === 1) {
-        // This is fine, just informational
-      } else if (perfectCount === 2) {
-        // Already has warning from RULE 8
-      }
-    }
-
-    // RULE 12: Type conflicts (Valid but user might be confused)
-    // Pokemon GO allows "fire&water" even though no Pokemon is both types
-    // This is VALID syntax, just returns 0 results
-    // Don't add error, this is intentional sometimes
-
-    // RULE 13: Age/Time filters (always valid, skip)
-
-    // RULE 14: Mega/Shadow/Purified combinations (check special cases)
-    const hasMega = andFilters.includes('megaevolve') || 
-                     andFilters.includes('mega0') || 
-                     andFilters.includes('mega1') || 
-                     andFilters.includes('mega2') || 
-                     andFilters.includes('mega3');
-    const hasShadow = andFilters.includes('shadow');
-    if (hasMega && hasShadow) {
-      warnings.push({
-        issue: `Mega AND Shadow`,
-        why: `Currently, Shadow Pokémon cannot Mega Evolve in Pokémon GO.`,
-        suggestion: `This search will return zero results. Consider using OR instead if you want either.`
-      });
-    }
-
-    // RULE 15: Buddy level checks (always valid)
-    // buddy0-5 can be combined freely
-
-    // RULE 16: CP/HP ranges (handled externally, skip)
-
-    // RULE 17: Distance filters (always valid, skip)
-
-    // RULE 18: Check for VALID but UNUSUAL searches (don't error, just inform)
-    const orStars = orFilters.filter(id => starRatings.includes(id));
-    if (orStars.includes('4*') && orStars.includes('0*') && orStars.length === 2) {
-      warnings.push({
-        issue: `4★ OR 0★ search`,
-        why: `This is valid but unusual - shows only perfect AND very weak Pokémon.`,
-        suggestion: `This might be intentional for collecting extremes, just confirming it's what you want.`
-      });
-    }
-
-    return {
-      valid: errors.length === 0,
-      hasWarnings: warnings.length > 0,
-      errors,
-      warnings
-    };
-  }, []);
 
   // Save language preference to localStorage
   React.useEffect(() => {
@@ -880,7 +866,9 @@ const PokemonGoSearchBuilder = () => {
 
   // Run validation on filterOperators change
   useEffect(() => {
+    console.log('Running validation with filterOperators:', filterOperators); // DEBUG
     const result = validateFilterOperators(filterOperators);
+    console.log('Setting validation result:', result); // DEBUG
     setValidationResult(result);
   }, [filterOperators, validateFilterOperators]);
 
@@ -1184,7 +1172,23 @@ const PokemonGoSearchBuilder = () => {
   const translateFilterLabel = (filter, language) => {
     if (!filter || !filter.label) return '';
     
+    // If language is English, return original label
+    if (language === 'English') {
+      return filter.label;
+    }
+    
+    // If filter has a labelKey, use it for translation
+    if (filter.labelKey) {
+      const translated = getUIText(filter.labelKey, language);
+      if (translated && translated !== filter.labelKey) {
+        return translated;
+      }
+      // Fall back to original label if translation not found
+      return filter.label;
+    }
+    
     const filterId = filter.id;
+    const filterValue = filter.value || filterId; // Use filter.value if available, fallback to filterId
     const originalLabel = filter.label;
     
     // Handle time-related filters (UI-only terms)
@@ -1206,6 +1210,22 @@ const PokemonGoSearchBuilder = () => {
     }
     if (filterId === 'distance100-') {
       return getUIText('distance_100km_plus', language);
+    }
+    
+    // Handle star ratings (4*, 3*, 2*, 1*, 0*)
+    if (filterId.match(/^\d\*$/)) {
+      // Star ratings are usually kept as-is in search strings, but try to translate the label
+      // The value is like "4*", "3*", etc.
+      const translated = translateTerm(filterValue, language, 'search');
+      if (translated !== filterValue) {
+        return translated;
+      }
+      // If translation not found, try to translate parts of the label
+      const labelMatch = originalLabel.match(/^(\d★)\s*\(([^)]+)\)/);
+      if (labelMatch) {
+        // Keep the star symbol, try to translate the percentage part
+        return originalLabel; // For now, keep original as star ratings are complex
+      }
     }
     
     // Handle move filters (with @ prefix)
@@ -1314,11 +1334,11 @@ const PokemonGoSearchBuilder = () => {
     
     // Handle stats filters - try to translate the whole term first, then fall back to parts
     if (filterId.includes('attack') || filterId.includes('defense') || filterId.includes('hp')) {
-      // Try translating the full term first (e.g., "4attack" -> "Perfect Attack")
-      const translated = translateTerm(filterId, language, 'search');
-      if (translated !== filterId) {
-        // If we got a translation, use it
-        return translated;
+      // Try translating the full term first using filter value (e.g., "4attack" -> translated)
+      const translated = translateTerm(filterValue, language, 'search');
+      if (translated !== filterValue) {
+        // If we got a translation, capitalize first letter for display
+        return translated.charAt(0).toUpperCase() + translated.slice(1);
       }
       // Otherwise, try to translate parts of the label
       const parts = originalLabel.split(' ');
@@ -1336,6 +1356,14 @@ const PokemonGoSearchBuilder = () => {
         return part;
       });
       return translatedParts.join(' ');
+    }
+    
+    // General fallback: try to translate the filter value directly
+    // This handles any filters that weren't caught by the specific cases above
+    const translated = translateTerm(filterValue, language, 'name');
+    if (translated !== filterValue) {
+      // Capitalize first letter for display
+      return translated.charAt(0).toUpperCase() + translated.slice(1);
     }
     
     // Default: return original label if no translation found
@@ -1938,10 +1966,10 @@ const PokemonGoSearchBuilder = () => {
                   <AlertTriangle size={24} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
                   <div className="flex-1">
                     <h3 className="font-bold text-base text-red-800 dark:text-red-200 mb-1">
-                      ⚠️ This search won't work in Pokémon GO
+                      {getUIText('validation_error_title', selectedLanguage)}
                     </h3>
                     <p className="text-xs text-red-700 dark:text-red-300 mb-3">
-                      These combinations are impossible, but you can still copy if you want to experiment.
+                      {getUIText('validation_error_subtitle', selectedLanguage)}
                     </p>
                   </div>
                 </div>
@@ -1953,10 +1981,10 @@ const PokemonGoSearchBuilder = () => {
                         ❌ {error.issue}
                       </div>
                       <div className="text-xs text-red-800 dark:text-red-200 mb-2">
-                        <strong>Why it won't work:</strong> {error.why}
+                        <strong>{getUIText('validation_why_label', selectedLanguage)}</strong> {error.why}
                       </div>
                       <div className="text-xs text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 p-2 rounded">
-                        <strong>✓ How to fix:</strong> {error.fix}
+                        <strong>{getUIText('validation_fix_label', selectedLanguage)}</strong> {error.fix}
                       </div>
                     </div>
                   ))}
@@ -2080,7 +2108,10 @@ const PokemonGoSearchBuilder = () => {
                   <>
                     <Copy className="w-5 h-5" />
                     <span className="hidden sm:inline">
-                      {getUIText('copy', selectedLanguage)}{!validationResult.valid ? ' (Has Issues)' : ''}
+                      {!validationResult.valid 
+                        ? getUIText('copy_has_issues', selectedLanguage)
+                        : getUIText('copy', selectedLanguage)
+                      }
                     </span>
                   </>
                 )}
@@ -2157,7 +2188,7 @@ const PokemonGoSearchBuilder = () => {
                     `}
                   >
                     <span className="font-mono font-bold text-xs">{symbols[operator]}</span>
-                    <span>{filter.label}</span>
+                    <span>{translateFilterLabel(filter, selectedLanguage)}</span>
                     <button
                       onClick={() => removeFilter(filterId)}
                       className="hover:scale-110 transition-transform"
@@ -2843,7 +2874,7 @@ const PokemonGoSearchBuilder = () => {
                             className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200"
                           >
                             <span className="flex-1 text-sm font-medium text-gray-800 dark:text-slate-100">
-                              {filter.label}
+                              {translateFilterLabel(filter, selectedLanguage)}
                             </span>
                             <div className="flex gap-1">
                               {operators.map(op => (
