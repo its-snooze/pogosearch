@@ -1919,8 +1919,8 @@ const PokemonGoSearchBuilder = () => {
         </div>
       )}
       
-      {/* Sticky Header with Output Section */}
-      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
+      {/* Header Section - Scrolls normally */}
+      <div className="bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           {/* Compact Header */}
           <div className="mb-4 flex items-center justify-between gap-4">
@@ -1946,9 +1946,30 @@ const PokemonGoSearchBuilder = () => {
                 </select>
                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
                   <Globe className="w-4 h-4 text-[#0077BE] dark:text-slate-100" />
-                  <span className="text-[10px] opacity-70 text-[#0077BE] dark:text-slate-100">{getUIText('language_wip', selectedLanguage)}</span>
                 </div>
               </div>
+              {/* Ko-fi Button */}
+              <a 
+                href="https://ko-fi.com/K3K0ZNM6K" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  padding: '6px 12px',
+                  backgroundColor: '#72a4f2',
+                  color: 'white',
+                  textDecoration: 'none',
+                  borderRadius: '4px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  transition: 'opacity 0.2s'
+                }}
+                onMouseEnter={(e) => e.target.style.opacity = '0.8'}
+                onMouseLeave={(e) => e.target.style.opacity = '1'}
+              >
+                ☕ Support
+              </a>
               <button
                 onClick={() => setIsDarkMode(prev => !prev)}
                 aria-pressed={isDarkMode}
@@ -1966,8 +1987,8 @@ const PokemonGoSearchBuilder = () => {
             </div>
           </div>
 
-          {/* Output Section - FOCAL POINT */}
-          <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50 dark:from-slate-900 dark:to-slate-900/70 dark:border-slate-700 dark:shadow-slate-900/40">
+          {/* Validation Messages - Scroll normally */}
+          <div className="mb-4">
             {/* Validation Errors - Red background, show WHY and HOW TO FIX */}
             {!validationResult.valid && validationResult.errors && validationResult.errors.length > 0 && (
               <div className="mb-4 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-500">
@@ -2025,7 +2046,14 @@ const PokemonGoSearchBuilder = () => {
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      </div>
 
+      {/* Sticky Search String Display Bar */}
+      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50 dark:from-slate-900 dark:to-slate-900/70 dark:border-slate-700 dark:shadow-slate-900/40">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <label className="text-sm font-bold text-gray-700 dark:text-slate-200">
@@ -2126,40 +2154,43 @@ const PokemonGoSearchBuilder = () => {
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      </div>
 
-            {/* Save Search Button */}
-            {searchString && searchString.trim() !== '' && (
-              <div className="mt-3 flex items-center justify-between">
-                <button
-                  onClick={handleSaveSearch}
-                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95 touch-manipulation"
-                >
-                  <Bookmark className="w-4 h-4" />
-                  <span>{getUIText('save_this_search', selectedLanguage)}</span>
-                </button>
-                {saveSuccessVisible && (
-                  <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm animate-save-success">
-                    <BookmarkCheck className="w-5 h-5" />
-                    <span>{getUIText('search_saved', selectedLanguage)}</span>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Conflicts Warning */}
-            {conflicts.length > 0 && (
-              <div className="mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg flex items-start gap-2 animate-pulse-warning dark:bg-amber-950/30 dark:border-amber-500">
-                <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="font-bold text-amber-800 text-sm mb-1 dark:text-amber-200">⚠️ {getUIText('conflicting_filters', selectedLanguage)}</p>
-                  {conflicts.map((conflict, idx) => (
-                    <p key={idx} className="text-xs text-amber-700 dark:text-amber-100">{conflict}</p>
-                  ))}
-                </div>
+      {/* Save Search Button and Conflicts - Scroll normally */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+        {/* Save Search Button */}
+        {searchString && searchString.trim() !== '' && (
+          <div className="mt-3 flex items-center justify-between">
+            <button
+              onClick={handleSaveSearch}
+              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-lg font-semibold text-sm transition-all duration-200 hover:shadow-lg hover:scale-105 active:scale-95 touch-manipulation"
+            >
+              <Bookmark className="w-4 h-4" />
+              <span>{getUIText('save_this_search', selectedLanguage)}</span>
+            </button>
+            {saveSuccessVisible && (
+              <div className="flex items-center gap-2 text-emerald-600 font-semibold text-sm animate-save-success">
+                <BookmarkCheck className="w-5 h-5" />
+                <span>{getUIText('search_saved', selectedLanguage)}</span>
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {/* Conflicts Warning */}
+        {conflicts.length > 0 && (
+          <div className="mt-3 p-3 bg-amber-50 border-2 border-amber-400 rounded-lg flex items-start gap-2 animate-pulse-warning dark:bg-amber-950/30 dark:border-amber-500">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-amber-800 text-sm mb-1 dark:text-amber-200">⚠️ {getUIText('conflicting_filters', selectedLanguage)}</p>
+              {conflicts.map((conflict, idx) => (
+                <p key={idx} className="text-xs text-amber-700 dark:text-amber-100">{conflict}</p>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Main Content */}
