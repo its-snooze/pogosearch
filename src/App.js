@@ -1894,7 +1894,7 @@ const PokemonGoSearchBuilder = () => {
       {/* Discord Invite Banner */}
       {!discordDismissed && (
         <div className="bg-gradient-to-r from-indigo-600/90 to-purple-600/90 backdrop-blur-sm border-b border-indigo-500/30 dark:from-indigo-900/80 dark:to-purple-900/80 dark:border-indigo-700/50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2 sm:py-3">
+          <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2 sm:py-3">
             <div className="flex items-center justify-between gap-3">
               <a
                 href={getUIText('discord_link', selectedLanguage)}
@@ -1921,34 +1921,19 @@ const PokemonGoSearchBuilder = () => {
       
       {/* Header Section - Scrolls normally */}
       <div className="bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          {/* Compact Header */}
-          <div className="mb-4 flex items-center justify-between gap-4">
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0077BE] to-[#00A7E5] bg-clip-text text-transparent">
+        <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
+          {/* Responsive Header */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-col gap-1">
+              <h1 className="text-xl sm:text-2xl font-bold bg-gradient-to-r from-[#0077BE] to-[#00A7E5] bg-clip-text text-transparent w-full">
                 {getUIText('app_title', selectedLanguage)}
               </h1>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-slate-400">
                 {getUIText('app_subtitle', selectedLanguage)}
               </p>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Language Selector */}
-              <div className="relative">
-                <select
-                  value={selectedLanguage}
-                  onChange={(e) => setSelectedLanguage(e.target.value)}
-                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900 cursor-pointer appearance-none pr-8"
-                >
-                  {getAvailableLanguages().map(lang => (
-                    <option key={lang} value={lang}>{lang}</option>
-                  ))}
-                </select>
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
-                  <Globe className="w-4 h-4 text-[#0077BE] dark:text-slate-100" />
-                </div>
-              </div>
-              {/* Ko-fi Button */}
+            <div className="flex flex-wrap items-center gap-2 sm:justify-end w-full">
+              {/* Ko-fi Button - keep separate so it's not accidentally tapped */}
               <a 
                 href="https://ko-fi.com/K3K0ZNM6K" 
                 target="_blank" 
@@ -1970,20 +1955,39 @@ const PokemonGoSearchBuilder = () => {
               >
                 ☕ Support
               </a>
-              <button
-                onClick={() => setIsDarkMode(prev => !prev)}
-                aria-pressed={isDarkMode}
-                className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors self-start"
-              >
-                {isDarkMode ? (
-                  <Sun className="w-4 h-4" />
-                ) : (
-                  <Moon className="w-4 h-4" />
-                )}
-                <span className="hidden sm:inline">
-                  {isDarkMode ? getUIText('light_mode', selectedLanguage) : getUIText('dark_mode', selectedLanguage)}
-                </span>
-              </button>
+
+              {/* Language + Theme controls grouped on the right */}
+              <div className="flex items-center gap-2 ml-auto">
+                {/* Language Selector */}
+                <div className="relative">
+                  <select
+                    value={selectedLanguage}
+                    onChange={(e) => setSelectedLanguage(e.target.value)}
+                    className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900 cursor-pointer appearance-none pr-8"
+                  >
+                    {getAvailableLanguages().map(lang => (
+                      <option key={lang} value={lang}>{lang}</option>
+                    ))}
+                  </select>
+                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1 pointer-events-none">
+                    <Globe className="w-4 h-4 text-[#0077BE] dark:text-slate-100" />
+                  </div>
+                </div>
+                <button
+                  onClick={() => setIsDarkMode(prev => !prev)}
+                  aria-pressed={isDarkMode}
+                  className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold px-3 sm:px-4 py-1.5 rounded-full border border-blue-200/70 text-[#0077BE] hover:bg-blue-50 dark:border-slate-700 dark:text-slate-100 dark:hover:bg-slate-800 transition-colors self-start"
+                >
+                  {isDarkMode ? (
+                    <Sun className="w-4 h-4" />
+                  ) : (
+                    <Moon className="w-4 h-4" />
+                  )}
+                  <span className="hidden sm:inline">
+                    {isDarkMode ? getUIText('light_mode', selectedLanguage) : getUIText('dark_mode', selectedLanguage)}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
 
@@ -2052,7 +2056,7 @@ const PokemonGoSearchBuilder = () => {
 
       {/* Sticky Search String Display Bar */}
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
           <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50 dark:from-slate-900 dark:to-slate-900/70 dark:border-slate-700 dark:shadow-slate-900/40">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -2159,7 +2163,7 @@ const PokemonGoSearchBuilder = () => {
       </div>
 
       {/* Save Search Button and Conflicts - Scroll normally */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-4">
+      <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 pb-4">
         {/* Save Search Button */}
         {searchString && searchString.trim() !== '' && (
           <div className="mt-3 flex items-center justify-between">
@@ -2194,7 +2198,7 @@ const PokemonGoSearchBuilder = () => {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+      <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* Active Filter Chips - Compact Display */}
         {(Object.keys(filterOperators).length > 0 || (customAgeValue && (customAgeIncluded || customAgeExcluded))) && (
