@@ -1940,6 +1940,27 @@ const PokemonGoSearchBuilder = () => {
       searchString: '888,484,889,483,646,644,643,249,376,890,800,792,250,383,381,648,671,468,791',
       tier: 'PvP',
       type: 'Master League'
+    },
+    communityDayCleanup: {
+      label: getUIText('premade_community_day_cleanup', selectedLanguage),
+      description: getUIText('premade_community_day_cleanup_desc', selectedLanguage),
+      searchString: 'age0-2&!shiny&!4*&!3*&!costume&!favorite',
+      tier: 'Event',
+      type: 'Cleanup'
+    },
+    spotlightHour2xTransfer: {
+      label: getUIText('premade_spotlight_hour_2x_transfer', selectedLanguage),
+      description: getUIText('premade_spotlight_hour_2x_transfer_desc', selectedLanguage),
+      searchString: 'legendary,mythical&!shiny&!4*&!buddy4-5&!favorite',
+      tier: 'Event',
+      type: 'Transfer'
+    },
+    frustrationTmEvent: {
+      label: getUIText('premade_frustration_tm_event', selectedLanguage),
+      description: getUIText('premade_frustration_tm_event_desc', selectedLanguage),
+      searchString: 'shadow&@frustration',
+      tier: 'Event',
+      type: 'TM'
     }
   }), [selectedLanguage]);
 
@@ -2881,6 +2902,43 @@ const PokemonGoSearchBuilder = () => {
                     >
                       <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('legendary_non_shiny', selectedLanguage)}</div>
                       <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('legendary_non_shiny_desc', selectedLanguage)}</div>
+                    </button>
+                  </Tooltip>
+                </div>
+              </div>
+
+              {/* Event-Specific Searches Subsection */}
+              <div className="mt-6">
+                <h3 className="text-sm font-bold text-gray-800 dark:text-slate-100 mb-4">{getUIText('premade_event_specific_searches', selectedLanguage)}</h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <Tooltip text={getUIText('premade_community_day_cleanup_desc', selectedLanguage)}>
+                    <button
+                      onClick={(e) => applyPremadeSearch('communityDayCleanup', e)}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('premade_community_day_cleanup', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('premade_community_day_cleanup_desc', selectedLanguage)}</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text={getUIText('premade_spotlight_hour_2x_transfer_desc', selectedLanguage)}>
+                    <button
+                      onClick={(e) => applyPremadeSearch('spotlightHour2xTransfer', e)}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('premade_spotlight_hour_2x_transfer', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('premade_spotlight_hour_2x_transfer_desc', selectedLanguage)}</div>
+                    </button>
+                  </Tooltip>
+
+                  <Tooltip text={getUIText('premade_frustration_tm_event_desc', selectedLanguage)}>
+                    <button
+                      onClick={(e) => applyPremadeSearch('frustrationTmEvent', e)}
+                      className="group relative p-3 sm:p-4 rounded-xl border-2 border-purple-300 dark:border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-900/60 dark:to-pink-900/60 hover:from-purple-100 hover:to-pink-100 dark:hover:from-purple-800/70 dark:hover:to-pink-800/70 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation"
+                    >
+                      <div className="font-bold text-sm sm:text-base text-purple-800 dark:text-purple-100 mb-1">{getUIText('premade_frustration_tm_event', selectedLanguage)}</div>
+                      <div className="text-[10px] sm:text-xs text-purple-600 dark:text-purple-200">{getUIText('premade_frustration_tm_event_desc', selectedLanguage)}</div>
                     </button>
                   </Tooltip>
                 </div>
