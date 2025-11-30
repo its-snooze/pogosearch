@@ -1,15 +1,15 @@
 {
   "files": {
-    "main.css": "/pogosearch/static/css/main.d9193656.css",
-    "main.js": "/pogosearch/static/js/main.4b8bcf26.js",
+    "main.css": "/pogosearch/static/css/main.a4fb42fb.css",
+    "main.js": "/pogosearch/static/js/main.bbc49f16.js",
     "static/js/453.c673994c.chunk.js": "/pogosearch/static/js/453.c673994c.chunk.js",
     "index.html": "/pogosearch/index.html",
-    "main.d9193656.css.map": "/pogosearch/static/css/main.d9193656.css.map",
-    "main.4b8bcf26.js.map": "/pogosearch/static/js/main.4b8bcf26.js.map",
+    "main.a4fb42fb.css.map": "/pogosearch/static/css/main.a4fb42fb.css.map",
+    "main.bbc49f16.js.map": "/pogosearch/static/js/main.bbc49f16.js.map",
     "453.c673994c.chunk.js.map": "/pogosearch/static/js/453.c673994c.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.d9193656.css",
-    "static/js/main.4b8bcf26.js"
+    "static/css/main.a4fb42fb.css",
+    "static/js/main.bbc49f16.js"
   ]
 }
