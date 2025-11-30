@@ -17,6 +17,12 @@ const categoryMeta = {
     gradient: 'from-blue-500 to-cyan-500',
     chipColor: 'bg-blue-500'
   },
+  cpRanges: {
+    nameKey: 'cp_ranges',
+    icon: TrendingUp,
+    gradient: 'from-violet-500 to-purple-500',
+    chipColor: 'bg-violet-500'
+  },
   types: { 
     nameKey: 'types',
     icon: Zap, 
@@ -87,6 +93,10 @@ const filterCategories = {
       { id: '0defense', label: 'Zero Defense', value: '0defense' },
       { id: '0hp', label: 'Zero HP', value: '0hp' },
     ]
+  },
+  cpRanges: {
+    nameKey: 'cp_ranges',
+    filters: [] // Special category - uses custom UI
   },
   types: {
     nameKey: 'types',
@@ -351,7 +361,6 @@ const PokemonGoSearchBuilder = () => {
   const [saveSearchName, setSaveSearchName] = useState('');
   const [showSavedSearches, setShowSavedSearches] = useState(false);
   const [showQuickSearches, setShowQuickSearches] = useState(false);
-  const [showCPRanges, setShowCPRanges] = useState(false);
   const [showPokemonSelection, setShowPokemonSelection] = useState(false);
   const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -1264,6 +1273,12 @@ const PokemonGoSearchBuilder = () => {
     const result = {};
     
     Object.entries(filterCategories).forEach(([key, category]) => {
+      // Special handling for cpRanges - always show it
+      if (key === 'cpRanges') {
+        result[key] = category;
+        return;
+      }
+      
       const matchingFilters = category.filters.filter(filter =>
         filter.label.toLowerCase().includes(search) ||
         filter.value.toLowerCase().includes(search)
@@ -2745,349 +2760,6 @@ const PokemonGoSearchBuilder = () => {
           )}
         </div>
 
-
-        {/* CP Ranges - Collapsible Section */}
-        <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-violet-100 dark:bg-slate-900/70 dark:border-violet-500/30">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setShowCPRanges(!showCPRanges)}
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-              >
-                <h3 className="text-base sm:text-lg font-bold text-gray-800 dark:text-slate-100">{getUIText('cp_ranges', selectedLanguage)}</h3>
-                <ChevronDown 
-                  className={`w-5 h-5 transition-transform duration-300 ${showCPRanges ? 'rotate-180' : ''}`}
-                />
-              </button>
-            </div>
-            <p className="text-xs text-gray-500 hidden sm:block dark:text-slate-400">{getUIText('insert_cp_range', selectedLanguage)}</p>
-          </div>
-
-          {showCPRanges && (
-            <div className="saved-searches-expand">
-              <div className="mb-3 p-3 bg-violet-50/80 border border-violet-200 rounded-lg dark:bg-slate-900/60 dark:border-violet-500/30">
-                <p className="text-xs text-violet-800 font-semibold mb-1 dark:text-violet-200">ℹ️ {getUIText('pvp_league_cp_caps', selectedLanguage)}</p>
-                <p className="text-xs text-violet-700 leading-relaxed dark:text-violet-100">
-                  {getUIText('pvp_league_cp_caps_desc', selectedLanguage)}
-                </p>
-              </div>
-
-              {/* Custom CP Range Input */}
-              <div className="mb-4 p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl border-2 border-violet-200 dark:border-violet-500/30">
-                <h4 className="text-sm font-bold text-violet-900 dark:text-violet-100 mb-3">Custom CP Range</h4>
-                
-                <div className="flex flex-col sm:flex-row gap-3 mb-3">
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-violet-800 dark:text-violet-200 mb-1">Min CP</label>
-                    <input
-                      type="text"
-                      value={customMinCP}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9]/g, '');
-                        setCustomMinCP(value);
-                        setCPRangeError('');
-                      }}
-                      placeholder="e.g., 1500"
-                      className="w-full px-3 py-2 border-2 border-violet-300 dark:border-violet-600 rounded-lg focus:border-violet-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/40 focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-xs font-medium text-violet-800 dark:text-violet-200 mb-1">Max CP</label>
-                    <input
-                      type="text"
-                      value={customMaxCP}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9]/g, '');
-                        setCustomMaxCP(value);
-                        setCPRangeError('');
-                      }}
-                      placeholder="e.g., 1500"
-                      className="w-full px-3 py-2 border-2 border-violet-300 dark:border-violet-600 rounded-lg focus:border-violet-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/40 focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    />
-                  </div>
-                </div>
-
-                {cpRangeError && (
-                  <div className="mb-3 p-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
-                    <p className="text-xs text-red-800 dark:text-red-200">{cpRangeError}</p>
-                  </div>
-                )}
-
-                {/* Operator Buttons */}
-                <div className="flex gap-2 mb-3">
-                  <button
-                    onClick={() => setCustomCPOperator('AND')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      customCPOperator === 'AND'
-                        ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
-                        : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-blue-700 border-2 border-blue-300 hover:bg-blue-50'
-                    }`}
-                  >
-                    AND (&)
-                  </button>
-                  <button
-                    onClick={() => setCustomCPOperator('OR')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      customCPOperator === 'OR'
-                        ? isDarkMode ? 'bg-green-600 text-white' : 'bg-green-500 text-white'
-                        : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-green-700 border-2 border-green-300 hover:bg-green-50'
-                    }`}
-                  >
-                    OR (,)
-                  </button>
-                  <button
-                    onClick={() => setCustomCPOperator('NOT')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                      customCPOperator === 'NOT'
-                        ? isDarkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'
-                        : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-red-700 border-2 border-red-300 hover:bg-red-50'
-                    }`}
-                  >
-                    NOT (!)
-                  </button>
-                </div>
-
-                {/* Add Button */}
-                <button
-                  onClick={() => {
-                    // Validate inputs
-                    if (!customMinCP && !customMaxCP) {
-                      setCPRangeError('Please enter at least one CP value');
-                      return;
-                    }
-                    
-                    const min = customMinCP ? parseInt(customMinCP, 10) : null;
-                    const max = customMaxCP ? parseInt(customMaxCP, 10) : null;
-                    
-                    if (min !== null && max !== null && min > max) {
-                      setCPRangeError('Min CP cannot be greater than Max CP');
-                      return;
-                    }
-                    
-                    const cpRange = generateCPRange(customMinCP, customMaxCP);
-                    if (cpRange) {
-                      insertCPRange(cpRange, customCPOperator);
-                      setCustomMinCP('');
-                      setCustomMaxCP('');
-                      setCPRangeError('');
-                    }
-                  }}
-                  className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600 text-white font-semibold rounded-lg transition-colors text-sm"
-                >
-                  Add CP Range to Search
-                </button>
-              </div>
-              
-              {/* Preset CP Range Buttons */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 dark:border-violet-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
-                  <div className="font-bold text-sm sm:text-base text-violet-800 dark:text-violet-200 mb-1">{getUIText('great_league', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-violet-600 dark:text-violet-300 font-mono mb-2">{getUIText('great_league_cp', selectedLanguage)}</div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-1500', 'AND');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                    >
-                      AND
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-1500', 'OR');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      OR
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-1500', 'NOT');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                    >
-                      NOT
-                    </button>
-                  </div>
-                </div>
-
-                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 dark:border-blue-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
-                  <div className="font-bold text-sm sm:text-base text-blue-800 dark:text-blue-200 mb-1">{getUIText('ultra_league', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-300 font-mono mb-2">{getUIText('ultra_league_cp', selectedLanguage)}</div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-2500', 'AND');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                    >
-                      AND
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-2500', 'OR');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      OR
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-2500', 'NOT');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                    >
-                      NOT
-                    </button>
-                  </div>
-                </div>
-
-                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 dark:border-amber-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
-                  <div className="font-bold text-sm sm:text-base text-amber-800 dark:text-amber-200 mb-1">{getUIText('master_league', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-300 font-mono mb-2">{getUIText('master_league_cp', selectedLanguage)}</div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp2500-', 'AND');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                    >
-                      AND
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp2500-', 'OR');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      OR
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp2500-', 'NOT');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                    >
-                      NOT
-                    </button>
-                  </div>
-                </div>
-
-                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 dark:border-green-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
-                  <div className="font-bold text-sm sm:text-base text-green-800 dark:text-green-200 mb-1">{getUIText('under_500_cp', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-green-600 dark:text-green-300 font-mono mb-2">{getUIText('under_500_cp_value', selectedLanguage)}</div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-500', 'AND');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                    >
-                      AND
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-500', 'OR');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      OR
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp-500', 'NOT');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                    >
-                      NOT
-                    </button>
-                  </div>
-                </div>
-
-                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 dark:from-orange-900/30 dark:to-red-900/30 dark:border-orange-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
-                  <div className="font-bold text-sm sm:text-base text-orange-800 dark:text-orange-200 mb-1">{getUIText('high_cp', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-300 font-mono mb-2">{getUIText('high_cp_value', selectedLanguage)}</div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp3000-', 'AND');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                    >
-                      AND
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp3000-', 'OR');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      OR
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp3000-', 'NOT');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                    >
-                      NOT
-                    </button>
-                  </div>
-                </div>
-
-                <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 dark:border-red-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
-                  <div className="font-bold text-sm sm:text-base text-red-800 dark:text-red-200 mb-1">{getUIText('perfect_cp', selectedLanguage)}</div>
-                  <div className="text-[10px] sm:text-xs text-red-600 dark:text-red-300 font-mono mb-2">{getUIText('perfect_cp_value', selectedLanguage)}</div>
-                  <div className="flex gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp4000-', 'AND');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
-                    >
-                      AND
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp4000-', 'OR');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
-                    >
-                      OR
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        insertCPRange('cp4000-', 'NOT');
-                      }}
-                      className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
-                    >
-                      NOT
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* Pokemon Selection Buttons - Collapsible Section */}
         <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 sm:p-5 mb-6 border border-green-100 dark:bg-slate-900/70 dark:border-green-500/30">
           <div className="flex items-center justify-between mb-4">
@@ -3242,7 +2914,7 @@ const PokemonGoSearchBuilder = () => {
             const isExpanded = expandedCategories[key];
             const activeCount = category.filters.filter(f => 
               filterOperators[f.id] !== undefined
-            ).length + (key === 'time' && (customAgeIncluded || customAgeExcluded) ? 1 : 0);
+            ).length + (key === 'time' && (customAgeIncluded || customAgeExcluded) ? 1 : 0) + (key === 'cpRanges' && cpRangeValue ? 1 : 0);
             
             return (
               <div key={key} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow duration-200 dark:bg-slate-900/70 dark:border-slate-800 dark:hover:shadow-slate-900/40">
@@ -3263,7 +2935,7 @@ const PokemonGoSearchBuilder = () => {
                         )}
                       </span>
                       <span className="text-xs sm:text-sm opacity-90">
-                        ({category.filters.length})
+                        ({key === 'cpRanges' ? '6' : category.filters.length})
                       </span>
                       {activeCount > 0 && (
                         <span className="px-2 py-0.5 bg-white/30 text-white text-xs font-bold rounded-full">
@@ -3280,6 +2952,329 @@ const PokemonGoSearchBuilder = () => {
                 {/* Category Content - Smooth Expand */}
                 {isExpanded && (
                   <div className="category-expand p-4 sm:p-5 bg-white dark:bg-slate-950/60">
+                  {key === 'cpRanges' ? (
+                    <div>
+                      <div className="mb-3 p-3 bg-violet-50/80 border border-violet-200 rounded-lg dark:bg-slate-900/60 dark:border-violet-500/30">
+                        <p className="text-xs text-violet-800 font-semibold mb-1 dark:text-violet-200">ℹ️ {getUIText('pvp_league_cp_caps', selectedLanguage)}</p>
+                        <p className="text-xs text-violet-700 leading-relaxed dark:text-violet-100">
+                          {getUIText('pvp_league_cp_caps_desc', selectedLanguage)}
+                        </p>
+                      </div>
+
+                      {/* Custom CP Range Input */}
+                      <div className="mb-4 p-4 bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-900/20 dark:to-purple-900/20 rounded-xl border-2 border-violet-200 dark:border-violet-500/30">
+                        <h4 className="text-sm font-bold text-violet-900 dark:text-violet-100 mb-3">Custom CP Range</h4>
+                        
+                        <div className="flex flex-col sm:flex-row gap-3 mb-3">
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-violet-800 dark:text-violet-200 mb-1">Min CP</label>
+                            <input
+                              type="text"
+                              value={customMinCP}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
+                                setCustomMinCP(value);
+                                setCPRangeError('');
+                              }}
+                              placeholder="e.g., 1500"
+                              className="w-full px-3 py-2 border-2 border-violet-300 dark:border-violet-600 rounded-lg focus:border-violet-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/40 focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-medium text-violet-800 dark:text-violet-200 mb-1">Max CP</label>
+                            <input
+                              type="text"
+                              value={customMaxCP}
+                              onChange={(e) => {
+                                const value = e.target.value.replace(/[^0-9]/g, '');
+                                setCustomMaxCP(value);
+                                setCPRangeError('');
+                              }}
+                              placeholder="e.g., 1500"
+                              className="w-full px-3 py-2 border-2 border-violet-300 dark:border-violet-600 rounded-lg focus:border-violet-500 dark:focus:border-violet-400 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-500/40 focus:outline-none text-sm bg-white dark:bg-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                            />
+                          </div>
+                        </div>
+
+                        {cpRangeError && (
+                          <div className="mb-3 p-2 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 rounded-lg">
+                            <p className="text-xs text-red-800 dark:text-red-200">{cpRangeError}</p>
+                          </div>
+                        )}
+
+                        {/* Operator Buttons */}
+                        <div className="flex gap-2 mb-3">
+                          <button
+                            onClick={() => setCustomCPOperator('AND')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              customCPOperator === 'AND'
+                                ? isDarkMode ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                                : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-blue-700 border-2 border-blue-300 hover:bg-blue-50'
+                            }`}
+                          >
+                            AND (&)
+                          </button>
+                          <button
+                            onClick={() => setCustomCPOperator('OR')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              customCPOperator === 'OR'
+                                ? isDarkMode ? 'bg-green-600 text-white' : 'bg-green-500 text-white'
+                                : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-green-700 border-2 border-green-300 hover:bg-green-50'
+                            }`}
+                          >
+                            OR (,)
+                          </button>
+                          <button
+                            onClick={() => setCustomCPOperator('NOT')}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                              customCPOperator === 'NOT'
+                                ? isDarkMode ? 'bg-red-600 text-white' : 'bg-red-500 text-white'
+                                : isDarkMode ? 'bg-slate-700 text-slate-300 hover:bg-slate-600' : 'bg-white text-red-700 border-2 border-red-300 hover:bg-red-50'
+                            }`}
+                          >
+                            NOT (!)
+                          </button>
+                        </div>
+
+                        {/* Add Button */}
+                        <button
+                          onClick={() => {
+                            // Validate inputs
+                            if (!customMinCP && !customMaxCP) {
+                              setCPRangeError('Please enter at least one CP value');
+                              return;
+                            }
+                            
+                            const min = customMinCP ? parseInt(customMinCP, 10) : null;
+                            const max = customMaxCP ? parseInt(customMaxCP, 10) : null;
+                            
+                            if (min !== null && max !== null && min > max) {
+                              setCPRangeError('Min CP cannot be greater than Max CP');
+                              return;
+                            }
+                            
+                            const cpRange = generateCPRange(customMinCP, customMaxCP);
+                            if (cpRange) {
+                              insertCPRange(cpRange, customCPOperator);
+                              setCustomMinCP('');
+                              setCustomMaxCP('');
+                              setCPRangeError('');
+                            }
+                          }}
+                          className="w-full px-4 py-2 bg-violet-600 hover:bg-violet-700 dark:bg-violet-500 dark:hover:bg-violet-600 text-white font-semibold rounded-lg transition-colors text-sm"
+                        >
+                          Add CP Range to Search
+                        </button>
+                      </div>
+                      
+                      {/* Preset CP Range Buttons */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+                        <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-violet-300 bg-gradient-to-br from-violet-50 to-purple-50 hover:from-violet-100 hover:to-purple-100 dark:from-violet-900/30 dark:to-purple-900/30 dark:border-violet-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                          <div className="font-bold text-sm sm:text-base text-violet-800 dark:text-violet-200 mb-1">{getUIText('great_league', selectedLanguage)}</div>
+                          <div className="text-[10px] sm:text-xs text-violet-600 dark:text-violet-300 font-mono mb-2">{getUIText('great_league_cp', selectedLanguage)}</div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-1500', 'AND');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            >
+                              AND
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-1500', 'OR');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                              OR
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-1500', 'NOT');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            >
+                              NOT
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-blue-300 bg-gradient-to-br from-blue-50 to-cyan-50 hover:from-blue-100 hover:to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30 dark:border-blue-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                          <div className="font-bold text-sm sm:text-base text-blue-800 dark:text-blue-200 mb-1">{getUIText('ultra_league', selectedLanguage)}</div>
+                          <div className="text-[10px] sm:text-xs text-blue-600 dark:text-blue-300 font-mono mb-2">{getUIText('ultra_league_cp', selectedLanguage)}</div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-2500', 'AND');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            >
+                              AND
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-2500', 'OR');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                              OR
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-2500', 'NOT');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            >
+                              NOT
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-amber-300 bg-gradient-to-br from-amber-50 to-yellow-50 hover:from-amber-100 hover:to-yellow-100 dark:from-amber-900/30 dark:to-yellow-900/30 dark:border-amber-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                          <div className="font-bold text-sm sm:text-base text-amber-800 dark:text-amber-200 mb-1">{getUIText('master_league', selectedLanguage)}</div>
+                          <div className="text-[10px] sm:text-xs text-amber-600 dark:text-amber-300 font-mono mb-2">{getUIText('master_league_cp', selectedLanguage)}</div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp2500-', 'AND');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            >
+                              AND
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp2500-', 'OR');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                              OR
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp2500-', 'NOT');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            >
+                              NOT
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-green-300 bg-gradient-to-br from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 dark:border-green-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                          <div className="font-bold text-sm sm:text-base text-green-800 dark:text-green-200 mb-1">{getUIText('under_500_cp', selectedLanguage)}</div>
+                          <div className="text-[10px] sm:text-xs text-green-600 dark:text-green-300 font-mono mb-2">{getUIText('under_500_cp_value', selectedLanguage)}</div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-500', 'AND');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            >
+                              AND
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-500', 'OR');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                              OR
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp-500', 'NOT');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            >
+                              NOT
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-orange-300 bg-gradient-to-br from-orange-50 to-red-50 hover:from-orange-100 hover:to-red-100 dark:from-orange-900/30 dark:to-red-900/30 dark:border-orange-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                          <div className="font-bold text-sm sm:text-base text-orange-800 dark:text-orange-200 mb-1">{getUIText('high_cp', selectedLanguage)}</div>
+                          <div className="text-[10px] sm:text-xs text-orange-600 dark:text-orange-300 font-mono mb-2">{getUIText('high_cp_value', selectedLanguage)}</div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp3000-', 'AND');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            >
+                              AND
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp3000-', 'OR');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                              OR
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp3000-', 'NOT');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            >
+                              NOT
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="group relative p-3 sm:p-4 rounded-xl border-2 border-red-300 bg-gradient-to-br from-red-50 to-rose-50 hover:from-red-100 hover:to-rose-100 dark:from-red-900/30 dark:to-rose-900/30 dark:border-red-500/30 transition-all duration-200 hover:shadow-lg hover:scale-[1.02] active:scale-[0.98] text-left touch-manipulation">
+                          <div className="font-bold text-sm sm:text-base text-red-800 dark:text-red-200 mb-1">{getUIText('perfect_cp', selectedLanguage)}</div>
+                          <div className="text-[10px] sm:text-xs text-red-600 dark:text-red-300 font-mono mb-2">{getUIText('perfect_cp_value', selectedLanguage)}</div>
+                          <div className="flex gap-1.5">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp4000-', 'AND');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}
+                            >
+                              AND
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp4000-', 'OR');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-green-500 hover:bg-green-600 text-white'}`}
+                            >
+                              OR
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                insertCPRange('cp4000-', 'NOT');
+                              }}
+                              className={`flex-1 px-2 py-1 rounded text-[10px] font-bold transition-all ${isDarkMode ? 'bg-red-600 hover:bg-red-700 text-white' : 'bg-red-500 hover:bg-red-600 text-white'}`}
+                            >
+                              NOT
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
                       {category.filters.map(filter => {
                         const currentOperator = filterOperators[filter.id];
@@ -3342,6 +3337,7 @@ const PokemonGoSearchBuilder = () => {
                         />
                       )}
                     </div>
+                  )}
                   </div>
                 )}
               </div>
