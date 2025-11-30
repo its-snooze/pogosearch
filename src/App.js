@@ -7,6 +7,7 @@ import {
 import { translateSearchString, translateTerm, translateToEnglish, getAvailableLanguages, getLocale } from './utils/translation';
 import { getUIText } from './translations/uiTranslations';
 import CustomAgeInput from './components/CustomAgeInput';
+import CustomSpeciesCountInput from './components/CustomSpeciesCountInput';
 import { parseSearchString, validateSearchString, buildSearchString as buildSearchStringFromParser } from './utils/searchParser';
 
 // Category metadata with colors and icons - names will be translated in component
@@ -384,6 +385,9 @@ const PokemonGoSearchBuilder = () => {
   const [customAgeValue, setCustomAgeValue] = useState('');
   const [customAgeIncluded, setCustomAgeIncluded] = useState(false);
   const [customAgeExcluded, setCustomAgeExcluded] = useState(false);
+  const [customSpeciesCountValue, setCustomSpeciesCountValue] = useState('');
+  const [customSpeciesCountIncluded, setCustomSpeciesCountIncluded] = useState(false);
+  const [customSpeciesCountExcluded, setCustomSpeciesCountExcluded] = useState(false);
   const [showOperatorHelp, setShowOperatorHelp] = useState(true);
   const [customMinCP, setCustomMinCP] = useState('');
   const [customMaxCP, setCustomMaxCP] = useState('');
@@ -778,7 +782,7 @@ const PokemonGoSearchBuilder = () => {
   // - , (OR) = Can have ANY condition
   // - ! (NOT) = Exclude condition
   // - Operator precedence: NOT > AND > OR (commas distribute over &)
-  const buildSearchString = useCallback((filterOps, customAge, customAgeOp, cpRange, cpRangeOp, lang = 'English') => {
+  const buildSearchString = useCallback((filterOps, customAge, customAgeOp, cpRange, cpRangeOp, speciesCount, speciesCountOp, lang = 'English') => {
     try {
       // Validate BEFORE building
       const validation = validateFilterOperators(filterOps, lang);
@@ -824,6 +828,17 @@ const PokemonGoSearchBuilder = () => {
           orFilters.push(cpRange);
         } else if (cpRangeOp === 'NOT') {
           notFilters.push(cpRange);
+        }
+      }
+
+      // Handle species count
+      if (speciesCount && speciesCount.trim()) {
+        if (speciesCountOp === 'AND') {
+          andFilters.push(speciesCount);
+        } else if (speciesCountOp === 'OR') {
+          orFilters.push(speciesCount);
+        } else if (speciesCountOp === 'NOT') {
+          notFilters.push(speciesCount);
         }
       }
 
@@ -940,17 +955,20 @@ const PokemonGoSearchBuilder = () => {
   React.useEffect(() => {
     if (!isPremadeSearch) {
       const customAgeOp = customAgeIncluded ? 'AND' : customAgeExcluded ? 'NOT' : null;
+      const speciesCountOp = customSpeciesCountIncluded ? 'AND' : customSpeciesCountExcluded ? 'NOT' : null;
       const newSearchString = buildSearchString(
         filterOperators,
         customAgeValue,
         customAgeOp,
         cpRangeValue,
         cpRangeOperator,
+        customSpeciesCountValue,
+        speciesCountOp,
         selectedLanguage
       );
       setSearchString(newSearchString);
     }
-  }, [filterOperators, customAgeValue, customAgeIncluded, customAgeExcluded, cpRangeValue, cpRangeOperator, selectedLanguage, isPremadeSearch, buildSearchString]);
+  }, [filterOperators, customAgeValue, customAgeIncluded, customAgeExcluded, cpRangeValue, cpRangeOperator, customSpeciesCountValue, customSpeciesCountIncluded, customSpeciesCountExcluded, selectedLanguage, isPremadeSearch, buildSearchString]);
 
   // Run validation on filterOperators change
   useEffect(() => {
@@ -1052,6 +1070,36 @@ const PokemonGoSearchBuilder = () => {
     }
   };
 
+  // Custom species count handlers
+  const handleCustomSpeciesCountInclude = () => {
+    setIsPremadeSearch(false);
+    if (customSpeciesCountIncluded) {
+      setCustomSpeciesCountIncluded(false);
+    } else {
+      setCustomSpeciesCountExcluded(false);
+      setCustomSpeciesCountIncluded(true);
+    }
+  };
+
+  const handleCustomSpeciesCountExclude = () => {
+    setIsPremadeSearch(false);
+    if (customSpeciesCountExcluded) {
+      setCustomSpeciesCountExcluded(false);
+    } else {
+      setCustomSpeciesCountIncluded(false);
+      setCustomSpeciesCountExcluded(true);
+    }
+  };
+
+  const handleCustomSpeciesCountValueChange = (value) => {
+    setCustomSpeciesCountValue(value);
+    // Clear include/exclude if value is cleared
+    if (!value || value.trim() === '') {
+      setCustomSpeciesCountIncluded(false);
+      setCustomSpeciesCountExcluded(false);
+    }
+  };
+
   const removeFilter = (filterId) => {
     setIsPremadeSearch(false);
     setRemovingChip(filterId);
@@ -1073,6 +1121,9 @@ const PokemonGoSearchBuilder = () => {
     setCustomAgeValue('');
     setCustomAgeIncluded(false);
     setCustomAgeExcluded(false);
+    setCustomSpeciesCountValue('');
+    setCustomSpeciesCountIncluded(false);
+    setCustomSpeciesCountExcluded(false);
     setCPRangeValue('');
     setCPRangeOperator('AND');
     pokedexNumbersRef.current = ''; // Clear Pokedex numbers ref
@@ -1113,6 +1164,8 @@ const PokemonGoSearchBuilder = () => {
       let customAgeOp = null;
       let cpRangeFound = null;
       let cpRangeOpFound = null;
+      let speciesCountFound = null;
+      let speciesCountOpFound = null;
       
       parts.forEach(part => {
         // Skip Pokedex numbers (all digits and commas)
@@ -1137,6 +1190,10 @@ const PokemonGoSearchBuilder = () => {
                 const ageValue = cleanValue.substring(3);
                 customAgeFound = ageValue;
                 customAgeOp = 'NOT';
+              } else if (cleanValue.startsWith('count') && cleanValue.endsWith('-')) {
+                // Check if it's species count
+                speciesCountFound = cleanValue;
+                speciesCountOpFound = 'NOT';
               } else {
                 const filter = findFilterByValue(cleanValue);
                 if (filter) {
@@ -1153,6 +1210,10 @@ const PokemonGoSearchBuilder = () => {
                 const ageValue = value.substring(3);
                 customAgeFound = ageValue;
                 customAgeOp = 'OR';
+              } else if (value.startsWith('count') && value.endsWith('-')) {
+                // Check if it's species count
+                speciesCountFound = value;
+                speciesCountOpFound = 'OR';
               } else {
                 const filter = findFilterByValue(value);
                 if (filter) {
@@ -1175,6 +1236,10 @@ const PokemonGoSearchBuilder = () => {
               const ageValue = cleanValue.substring(3);
               customAgeFound = ageValue;
               customAgeOp = 'NOT';
+            } else if (cleanValue.startsWith('count') && cleanValue.endsWith('-')) {
+              // Check if it's species count
+              speciesCountFound = cleanValue;
+              speciesCountOpFound = 'NOT';
             } else {
               const filter = findFilterByValue(cleanValue);
               if (filter) {
@@ -1191,6 +1256,10 @@ const PokemonGoSearchBuilder = () => {
               const ageValue = part.substring(3);
               customAgeFound = ageValue;
               customAgeOp = 'AND';
+            } else if (part.startsWith('count') && part.endsWith('-')) {
+              // Check if it's species count
+              speciesCountFound = part;
+              speciesCountOpFound = 'AND';
             } else {
               const filter = findFilterByValue(part);
               if (filter) {
@@ -1220,6 +1289,25 @@ const PokemonGoSearchBuilder = () => {
         setCustomAgeValue('');
         setCustomAgeIncluded(false);
         setCustomAgeExcluded(false);
+      }
+
+      // Handle species count
+      if (speciesCountFound !== null) {
+        setCustomSpeciesCountValue(speciesCountFound);
+        if (speciesCountOpFound === 'AND') {
+          setCustomSpeciesCountIncluded(true);
+          setCustomSpeciesCountExcluded(false);
+        } else if (speciesCountOpFound === 'OR') {
+          setCustomSpeciesCountIncluded(true);
+          setCustomSpeciesCountExcluded(false);
+        } else if (speciesCountOpFound === 'NOT') {
+          setCustomSpeciesCountIncluded(false);
+          setCustomSpeciesCountExcluded(true);
+        }
+      } else {
+        setCustomSpeciesCountValue('');
+        setCustomSpeciesCountIncluded(false);
+        setCustomSpeciesCountExcluded(false);
       }
 
       // Handle CP range
@@ -1523,6 +1611,15 @@ const PokemonGoSearchBuilder = () => {
         return ageValue;
       };
       return formatAgeForDisplay(customAgeValue);
+    }
+    if (filterId === 'customSpeciesCount') {
+      if (!customSpeciesCountValue) return 'Species Count';
+      // Remove "count" prefix and trailing dash for display
+      if (customSpeciesCountValue.startsWith('count')) {
+        const countPart = customSpeciesCountValue.substring(5);
+        return countPart.endsWith('-') ? `Have ${countPart.slice(0, -1)}+` : `Have ${countPart}+`;
+      }
+      return `Have ${customSpeciesCountValue}+`;
     }
     const filter = Object.values(filterCategories)
       .flatMap(cat => cat.filters)
@@ -2293,7 +2390,7 @@ const PokemonGoSearchBuilder = () => {
       <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-6 sm:py-8">
 
         {/* Active Filter Chips - Compact Display */}
-        {(Object.keys(filterOperators).length > 0 || (customAgeValue && (customAgeIncluded || customAgeExcluded)) || cpRangeValue) && (
+        {(Object.keys(filterOperators).length > 0 || (customAgeValue && (customAgeIncluded || customAgeExcluded)) || (customSpeciesCountValue && (customSpeciesCountIncluded || customSpeciesCountExcluded)) || cpRangeValue) && (
           <div className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md p-4 mb-6 border border-blue-100 dark:bg-slate-900/70 dark:border-slate-800">
             <div className="flex flex-wrap gap-2">
               {Object.entries(filterOperators).map(([filterId, operator]) => {
@@ -2357,6 +2454,38 @@ const PokemonGoSearchBuilder = () => {
                         setCustomAgeIncluded(false);
                         setCustomAgeExcluded(false);
                         setCustomAgeValue('');
+                        setRemovingChip(null);
+                      }, 300);
+                    }}
+                    className="hover:scale-110 transition-transform"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+              {customSpeciesCountValue && (customSpeciesCountIncluded || customSpeciesCountExcluded) && (
+                <div
+                  className={`
+                    flex items-center gap-2 px-3 py-1.5 rounded-full text-sm
+                    border-2 transition-all
+                    ${customSpeciesCountIncluded 
+                      ? (isDarkMode ? 'bg-blue-600 border-blue-500 text-blue-100' : 'bg-blue-100 border-blue-300 text-blue-800')
+                      : (isDarkMode ? 'bg-red-600 border-red-500 text-red-100' : 'bg-red-100 border-red-300 text-red-800')
+                    }
+                    ${removingChip === 'customSpeciesCount' ? 'scale-0 opacity-0' : 'scale-100 opacity-100'}
+                  `}
+                >
+                  <span className="font-mono font-bold text-xs">
+                    {customSpeciesCountIncluded ? '&' : '!'}
+                  </span>
+                  <span>{customSpeciesCountValue}</span>
+                  <button
+                    onClick={() => {
+                      setRemovingChip('customSpeciesCount');
+                      setTimeout(() => {
+                        setCustomSpeciesCountIncluded(false);
+                        setCustomSpeciesCountExcluded(false);
+                        setCustomSpeciesCountValue('');
                         setRemovingChip(null);
                       }, 300);
                     }}
@@ -2914,7 +3043,7 @@ const PokemonGoSearchBuilder = () => {
             const isExpanded = expandedCategories[key];
             const activeCount = category.filters.filter(f => 
               filterOperators[f.id] !== undefined
-            ).length + (key === 'time' && (customAgeIncluded || customAgeExcluded) ? 1 : 0) + (key === 'cpRanges' && cpRangeValue ? 1 : 0);
+            ).length + (key === 'time' && (customAgeIncluded || customAgeExcluded) ? 1 : 0) + (key === 'evolution' && (customSpeciesCountIncluded || customSpeciesCountExcluded) ? 1 : 0) + (key === 'cpRanges' && cpRangeValue ? 1 : 0);
             
             return (
               <div key={key} className="bg-white/80 backdrop-blur-sm rounded-xl shadow-md overflow-hidden border border-blue-100 hover:shadow-lg transition-shadow duration-200 dark:bg-slate-900/70 dark:border-slate-800 dark:hover:shadow-slate-900/40">
@@ -3333,6 +3462,18 @@ const PokemonGoSearchBuilder = () => {
                           onInclude={handleCustomAgeInclude}
                           onExclude={handleCustomAgeExclude}
                           onValueChange={handleCustomAgeValueChange}
+                          selectedLanguage={selectedLanguage}
+                        />
+                      )}
+                      {/* Custom Species Count Input - only show in evolution category */}
+                      {key === 'evolution' && (
+                        <CustomSpeciesCountInput
+                          value={customSpeciesCountValue}
+                          isIncluded={customSpeciesCountIncluded}
+                          isExcluded={customSpeciesCountExcluded}
+                          onInclude={handleCustomSpeciesCountInclude}
+                          onExclude={handleCustomSpeciesCountExclude}
+                          onValueChange={handleCustomSpeciesCountValueChange}
                           selectedLanguage={selectedLanguage}
                         />
                       )}
