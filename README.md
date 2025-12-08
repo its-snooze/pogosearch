@@ -80,8 +80,10 @@
 - **Regions** - Kanto, Johto, Hoenn, etc.
 
 **Include vs. Exclude:**
-- Green ➕ button = Include (must have this)
-- Red ➖ button = Exclude (must NOT have this)
+- 3-Button Operator System (AND/OR/NOT)
+, (OR) - Can have this (comma operator)
+& (AND) - Must have this (ampersand operator)
+! (NOT) - Exclude this (exclamation operator)
 
 **Example Searches:**
 - `shiny&legendary` - All shiny legendaries
