@@ -1,0 +1,124 @@
+{
+  "lastUpdated": "2025-12-08",
+  "eventName": "Journey to Paldea",
+  "eventDates": "Dec 4 - Dec 9",
+  "tier5": [
+    {
+      "name": "Kyurem",
+      "types": ["Dragon", "Ice"],
+      "counters": ["Metagross", "Dialga", "Lucario", "Conkeldurr", "Reshiram", "Zekrom", "Blaziken", "Chandelure", "Terrakion", "Machamp"]
+    }
+  ],
+  "mega": [
+    {
+      "name": "Mega Gyarados",
+      "types": ["Water", "Dark"],
+      "counters": ["Kartana", "Xurkitree", "Zarude", "Tapu Bulu", "Raikou", "Electivire", "Magnezone", "Zekrom", "Thundurus", "Zapdos"]
+    }
+  ],
+  "tier3": [
+    {
+      "name": "Dondozo",
+      "types": ["Water"],
+      "counters": ["Kartana", "Xurkitree", "Zarude", "Tapu Bulu", "Raikou", "Electivire", "Magnezone", "Roserade", "Venusaur", "Leafeon"]
+    },
+    {
+      "name": "Bombirdier",
+      "types": ["Flying", "Dark"],
+      "counters": ["Xurkitree", "Rampardos", "Rhyperior", "Terrakion", "Tyranitar", "Gigalith", "Raikou", "Zekrom", "Magnezone", "Metagross"]
+    },
+    {
+      "name": "Paldean Tauros (Combat Breed)",
+      "types": ["Fighting"],
+      "counters": ["Mewtwo", "Lugia", "Ho-Oh", "Rayquaza", "Latios", "Togekiss", "Gardevoir", "Alakazam", "Espeon", "Moltres"]
+    },
+    {
+      "name": "Paldean Tauros (Blaze Breed)",
+      "types": ["Fighting", "Fire"],
+      "counters": ["Mewtwo", "Kyogre", "Garchomp", "Rhyperior", "Landorus", "Groudon", "Swampert", "Kingler", "Gyarados", "Terrakion"]
+    },
+    {
+      "name": "Paldean Tauros (Aqua Breed)",
+      "types": ["Fighting", "Water"],
+      "counters": ["Kartana", "Xurkitree", "Zarude", "Tapu Bulu", "Raikou", "Electivire", "Magnezone", "Mewtwo", "Lugia", "Celebi"]
+    }
+  ],
+  "tier1": [
+    {
+      "name": "Geodude",
+      "types": ["Rock", "Ground"],
+      "counters": ["Kartana", "Kyogre", "Kingler", "Samurott", "Swampert", "Gyarados", "Zarude", "Leafeon", "Venusaur", "Roserade"]
+    },
+    {
+      "name": "Aipom",
+      "types": ["Normal"],
+      "counters": ["Lucario", "Conkeldurr", "Machamp", "Terrakion", "Breloom", "Blaziken", "Hariyama", "Sirfetch'd", "Pheromosa", "Buzzwole"]
+    },
+    {
+      "name": "Aron",
+      "types": ["Steel", "Rock"],
+      "counters": ["Lucario", "Conkeldurr", "Machamp", "Terrakion", "Reshiram", "Chandelure", "Blaziken", "Garchomp", "Landorus", "Groudon"]
+    },
+    {
+      "name": "Gulpin",
+      "types": ["Poison"],
+      "counters": ["Mewtwo", "Garchomp", "Landorus", "Groudon", "Excadrill", "Rhyperior", "Alakazam", "Espeon", "Latios", "Hoopa"]
+    }
+  ],
+  "shadow5": [
+    {
+      "name": "Shadow Heatran",
+      "types": ["Fire", "Steel"],
+      "counters": ["Primal Groudon", "Garchomp", "Rhyperior", "Landorus", "Excadrill", "Swampert", "Kingler", "Kyogre", "Rhydon", "Donphan"]
+    }
+  ],
+  "shadow3": [
+    {
+      "name": "Shadow Scyther",
+      "types": ["Bug", "Flying"],
+      "counters": ["Rampardos", "Rhyperior", "Terrakion", "Tyranitar", "Gigalith", "Aggron", "Golem", "Aerodactyl", "Regirock", "Omastar"]
+    },
+    {
+      "name": "Shadow Aerodactyl",
+      "types": ["Rock", "Flying"],
+      "counters": ["Rampardos", "Rhyperior", "Terrakion", "Metagross", "Dialga", "Kyogre", "Swampert", "Kingler", "Magnezone", "Zekrom"]
+    },
+    {
+      "name": "Shadow Sableye",
+      "types": ["Dark", "Ghost"],
+      "counters": ["Gardevoir", "Togekiss", "Granbull", "Xurkitree", "Zacian", "Tapu Bulu", "Florges", "Sylveon", "Primarina", "Mega Altaria"]
+    }
+  ],
+  "shadow1": [
+    {
+      "name": "Shadow Drowzee",
+      "types": ["Psychic"],
+      "counters": ["Gengar", "Chandelure", "Darkrai", "Hydreigon", "Yveltal", "Weavile", "Tyranitar", "Hoopa", "Giratina", "Zarude"]
+    },
+    {
+      "name": "Shadow Ralts",
+      "types": ["Psychic", "Fairy"],
+      "counters": ["Metagross", "Dialga", "Genesect", "Excadrill", "Scizor", "Gengar", "Nihilego", "Chandelure", "Jirachi", "Heatran"]
+    },
+    {
+      "name": "Shadow Bagon",
+      "types": ["Dragon"],
+      "counters": ["Dialga", "Palkia", "Garchomp", "Dragonite", "Salamence", "Rayquaza", "Zekrom", "Reshiram", "Kyurem", "Mamoswine"]
+    },
+    {
+      "name": "Shadow Snover",
+      "types": ["Grass", "Ice"],
+      "counters": ["Reshiram", "Chandelure", "Blaziken", "Darmanitan", "Moltres", "Entei", "Heatran", "Metagross", "Lucario", "Conkeldurr"]
+    },
+    {
+      "name": "Shadow Yamask",
+      "types": ["Ghost"],
+      "counters": ["Gengar", "Chandelure", "Darkrai", "Hydreigon", "Yveltal", "Weavile", "Tyranitar", "Hoopa", "Giratina", "Zarude"]
+    },
+    {
+      "name": "Shadow Phantump",
+      "types": ["Ghost", "Grass"],
+      "counters": ["Reshiram", "Chandelure", "Blaziken", "Darmanitan", "Moltres", "Gengar", "Yveltal", "Darkrai", "Weavile", "Hydreigon"]
+    }
+  ]
+}

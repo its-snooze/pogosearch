@@ -1,0 +1,36 @@
+{
+  "short_name": "PoGo Search",
+  "name": "Pokemon GO Search String Builder",
+  "description": "Build complex Pokemon GO search strings with an easy-to-use interface",
+  "icons": [
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "logo192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "logo512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#0077BE",
+  "background_color": "#ffffff",
+  "orientation": "portrait"
+}
