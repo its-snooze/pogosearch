@@ -202,6 +202,144 @@ const FALLBACK_RAIDS = [
       { name: "Cloudy", image: WEATHER_IMAGES.Cloudy }
     ],
     image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_257_00.png"
+  },
+  // SHADOW RAIDS
+  {
+    name: "Shadow Drowzee",
+    tier: "Shadow 1",
+    canBeShiny: true,
+    types: [
+      { name: "Psychic", image: TYPE_IMAGES.Psychic }
+    ],
+    combatPower: {
+      normal: { min: 512, max: 594 },
+      boosted: { min: 640, max: 743 }
+    },
+    boostedWeather: [
+      { name: "Windy", image: WEATHER_IMAGES.Windy }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_096_00.png"
+  },
+  {
+    name: "Shadow Ralts",
+    tier: "Shadow 1",
+    canBeShiny: true,
+    types: [
+      { name: "Psychic", image: TYPE_IMAGES.Psychic },
+      { name: "Fairy", image: TYPE_IMAGES.Fairy }
+    ],
+    combatPower: {
+      normal: { min: 250, max: 308 },
+      boosted: { min: 313, max: 385 }
+    },
+    boostedWeather: [
+      { name: "Windy", image: WEATHER_IMAGES.Windy },
+      { name: "Cloudy", image: WEATHER_IMAGES.Cloudy }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_280_00.png"
+  },
+  {
+    name: "Shadow Bagon",
+    tier: "Shadow 1",
+    canBeShiny: true,
+    types: [
+      { name: "Dragon", image: TYPE_IMAGES.Dragon }
+    ],
+    combatPower: {
+      normal: { min: 575, max: 660 },
+      boosted: { min: 719, max: 826 }
+    },
+    boostedWeather: [
+      { name: "Windy", image: WEATHER_IMAGES.Windy }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_371_00.png"
+  },
+  {
+    name: "Shadow Snover",
+    tier: "Shadow 1",
+    canBeShiny: true,
+    types: [
+      { name: "Grass", image: TYPE_IMAGES.Grass },
+      { name: "Ice", image: TYPE_IMAGES.Ice }
+    ],
+    combatPower: {
+      normal: { min: 577, max: 662 },
+      boosted: { min: 721, max: 828 }
+    },
+    boostedWeather: [
+      { name: "Sunny", image: WEATHER_IMAGES.Sunny },
+      { name: "Snow", image: WEATHER_IMAGES.Snow }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_459_00.png"
+  },
+  {
+    name: "Shadow Scyther",
+    tier: "Shadow 3",
+    canBeShiny: true,
+    types: [
+      { name: "Bug", image: TYPE_IMAGES.Bug },
+      { name: "Flying", image: TYPE_IMAGES.Flying }
+    ],
+    combatPower: {
+      normal: { min: 1414, max: 1546 },
+      boosted: { min: 1768, max: 1933 }
+    },
+    boostedWeather: [
+      { name: "Rainy", image: WEATHER_IMAGES.Rainy },
+      { name: "Windy", image: WEATHER_IMAGES.Windy }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_123_00.png"
+  },
+  {
+    name: "Shadow Aerodactyl",
+    tier: "Shadow 3",
+    canBeShiny: true,
+    types: [
+      { name: "Rock", image: TYPE_IMAGES.Rock },
+      { name: "Flying", image: TYPE_IMAGES.Flying }
+    ],
+    combatPower: {
+      normal: { min: 1456, max: 1590 },
+      boosted: { min: 1821, max: 1988 }
+    },
+    boostedWeather: [
+      { name: "Partly Cloudy", image: WEATHER_IMAGES['Partly Cloudy'] },
+      { name: "Windy", image: WEATHER_IMAGES.Windy }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_142_00.png"
+  },
+  {
+    name: "Shadow Sableye",
+    tier: "Shadow 3",
+    canBeShiny: true,
+    types: [
+      { name: "Dark", image: TYPE_IMAGES.Dark },
+      { name: "Ghost", image: TYPE_IMAGES.Ghost }
+    ],
+    combatPower: {
+      normal: { min: 747, max: 843 },
+      boosted: { min: 934, max: 1054 }
+    },
+    boostedWeather: [
+      { name: "Fog", image: WEATHER_IMAGES.Fog }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_302_00.png"
+  },
+  {
+    name: "Shadow Cresselia",
+    tier: "Shadow 5",
+    canBeShiny: true,
+    types: [
+      { name: "Psychic", image: TYPE_IMAGES.Psychic }
+    ],
+    combatPower: {
+      normal: { min: 1494, max: 1633 },
+      boosted: { min: 1867, max: 2041 }
+    },
+    boostedWeather: [
+      { name: "Windy", image: WEATHER_IMAGES.Windy }
+    ],
+    image: "https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_488_00.png"
   }
 ];
 
@@ -272,9 +410,114 @@ function extractWeatherName(imgElement) {
 }
 
 /**
+ * Helper: Check if a name is a type or weather (NOT a Pokemon)
+ */
+function isTypeOrWeather(name) {
+  if (!name || typeof name !== 'string') return true;
+  
+  const types = ['Normal', 'Fire', 'Water', 'Electric', 'Grass', 'Ice', 
+                 'Fighting', 'Poison', 'Ground', 'Flying', 'Psychic', 
+                 'Bug', 'Rock', 'Ghost', 'Dragon', 'Dark', 'Steel', 'Fairy'];
+  
+  const weather = ['Sunny', 'Rainy', 'Cloudy', 'Partly Cloudy', 'Windy', 
+                   'Snow', 'Fog', 'Clear'];
+  
+  const cleanName = name.trim();
+  
+  // Exact match
+  if (types.includes(cleanName) || weather.includes(cleanName)) return true;
+  
+  // Check if it's a combination of types (e.g., "BugRock")
+  for (const type of types) {
+    if (cleanName.includes(type) && cleanName !== type) {
+      return true;
+    }
+  }
+  
+  // Pokemon names are at least 3 chars
+  if (cleanName.length < 3) return true;
+  
+  return false;
+}
+
+/**
+ * Helper: Extract clean text from a node, excluding nested elements
+ */
+function getDirectText(node) {
+  if (!node) return '';
+  
+  let text = '';
+  for (const child of node.childNodes) {
+    if (child.nodeType === Node.TEXT_NODE) {
+      text += child.textContent;
+    }
+  }
+  return text.trim();
+}
+
+/**
+ * Helper: Parse CP ranges from text
+ */
+function parseCPRanges(text) {
+  const cpPattern = /CP\s+(\d+)\s*-\s*(\d+)/gi;
+  const matches = [...text.matchAll(cpPattern)];
+  
+  if (matches.length >= 2) {
+    return {
+      normal: {
+        min: parseInt(matches[0][1], 10),
+        max: parseInt(matches[0][2], 10)
+      },
+      boosted: {
+        min: parseInt(matches[1][1], 10),
+        max: parseInt(matches[1][2], 10)
+      }
+    };
+  } else if (matches.length === 1) {
+    const min = parseInt(matches[0][1], 10);
+    const max = parseInt(matches[0][2], 10);
+    return {
+      normal: { min, max },
+      boosted: {
+        min: Math.floor(min * 1.25),
+        max: Math.floor(max * 1.25)
+      }
+    };
+  }
+  
+  return {
+    normal: { min: 0, max: 0 },
+    boosted: { min: 0, max: 0 }
+  };
+}
+
+/**
+ * Helper: Check if a header is under the Shadow Raids section
+ * Walks backwards through siblings to find "Shadow Raids" header
+ */
+function isPreviousHeaderShadow(currentHeader) {
+  let node = currentHeader.previousElementSibling;
+  while (node) {
+    if (node.tagName === 'H2' || node.tagName === 'H3') {
+      const text = node.textContent.trim();
+      if (text.includes('Shadow Raids')) {
+        return true;
+      }
+      // If we hit a non-shadow header, stop
+      if (text.includes('Star Raids') || text.includes('Mega Raids')) {
+        return false;
+      }
+    }
+    node = node.previousElementSibling;
+  }
+  return false;
+}
+
+/**
  * Parses LeekDuck HTML to extract raid boss data
  */
 function parseLeekDuckHTML(html) {
+  console.log('=== Starting LeekDuck HTML Parsing ===');
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
   const raids = [];
@@ -285,60 +528,122 @@ function parseLeekDuckHTML(html) {
   
   tierHeaders.forEach(header => {
     const headerText = header.textContent.trim();
+    console.log(`Found header: "${headerText}"`);
     
     // Determine tier from header text
     let tier = null;
     if (headerText.includes('1-Star') || headerText.includes('Tier 1')) {
-      tier = 'Tier 1';
+      // Check if this is under Shadow Raids section
+      const isShadow = headerText.includes('Shadow') || 
+                       header.closest('[id*="shadow"]') !== null ||
+                       // Check previous headers for "Shadow Raids"
+                       isPreviousHeaderShadow(header);
+      tier = isShadow ? 'Shadow 1' : 'Tier 1';
     } else if (headerText.includes('3-Star') || headerText.includes('Tier 3')) {
-      tier = 'Tier 3';
+      const isShadow = headerText.includes('Shadow') || 
+                       header.closest('[id*="shadow"]') !== null ||
+                       isPreviousHeaderShadow(header);
+      tier = isShadow ? 'Shadow 3' : 'Tier 3';
     } else if (headerText.includes('5-Star') || headerText.includes('Tier 5')) {
-      tier = 'Tier 5';
+      const isShadow = headerText.includes('Shadow') || 
+                       header.closest('[id*="shadow"]') !== null ||
+                       isPreviousHeaderShadow(header);
+      tier = isShadow ? 'Shadow 5' : 'Tier 5';
     } else if (headerText.includes('Mega')) {
       tier = 'Mega';
     }
     
     if (!tier) return;
     
-    // Find raid boss cards after this header
-    // Look for the next section or cards within the same parent
+    console.log(`  → Processing ${tier} section`);
+    
+    // Find the section container for this tier
+    // Walk through siblings until next header or find parent container
+    let sectionNode = header.parentElement;
     let currentElement = header.nextElementSibling;
-    const parent = header.parentElement;
     
-    // Try to find cards in the same section
-    const cards = parent.querySelectorAll('[class*="card"], [class*="raid"], [class*="boss"], [class*="pokemon"]');
-    
-    // If no cards found, look for next siblings
-    if (cards.length === 0) {
-      // Walk through siblings until next header
-      while (currentElement && currentElement.tagName && !['H2', 'H3'].includes(currentElement.tagName)) {
-        if (currentElement.querySelector && currentElement.querySelector('img')) {
-          cards.push(currentElement);
-        }
-        currentElement = currentElement.nextElementSibling;
+    // Try to find a container that holds all cards for this tier
+    while (currentElement && currentElement.tagName && !['H2', 'H3'].includes(currentElement.tagName)) {
+      if (currentElement.querySelector && currentElement.querySelector('img[src*="pokemon_icons"]')) {
+        sectionNode = currentElement;
+        break;
       }
+      currentElement = currentElement.nextElementSibling;
     }
     
-    // Parse each card
-    cards.forEach(card => {
+    // Only find Pokemon icons, not all images
+    const pokemonImages = sectionNode.querySelectorAll('img[src*="pokemon_icons"]');
+    
+    pokemonImages.forEach(img => {
       try {
-        // Extract Pokemon name
-        const nameElement = card.querySelector('h3, h4, [class*="name"], [class*="title"]') || 
-                           card.querySelector('strong, b') ||
-                           card;
-        const name = nameElement.textContent.trim();
-        if (!name || name.length < 2) return;
+        console.log(`    Found Pokemon image: ${img.getAttribute('src')}`);
         
-        // Extract image
-        const imgElement = card.querySelector('img[src*="pokemon"], img[src*="icon"]');
-        const imageUrl = imgElement ? imgElement.getAttribute('src') : null;
+        // Extract name from text node following the image
+        let name = null;
+        let node = img.nextSibling;
         
-        // Extract types
-        const typeElements = card.querySelectorAll('img[src*="type"], img[alt*="type"]');
+        // Walk through next siblings to find the Pokemon name
+        while (node && !name) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim();
+            if (text && !isTypeOrWeather(text)) {
+              name = text;
+              break;
+            }
+          } else if (node.nodeType === Node.ELEMENT_NODE) {
+            // Check direct text content of element
+            const text = getDirectText(node);
+            if (text && !isTypeOrWeather(text)) {
+              name = text;
+              break;
+            }
+            // Also check first text node child
+            if (node.firstChild && node.firstChild.nodeType === Node.TEXT_NODE) {
+              const text = node.firstChild.textContent.trim();
+              if (text && !isTypeOrWeather(text)) {
+                name = text;
+                break;
+              }
+            }
+          }
+          node = node.nextSibling;
+        }
+        
+        // If still no name, try parent element
+        if (!name) {
+          const parent = img.parentElement;
+          if (parent) {
+            const parentText = getDirectText(parent);
+            if (parentText && !isTypeOrWeather(parentText)) {
+              name = parentText;
+            }
+          }
+        }
+        
+        // Skip if invalid
+        if (!name || isTypeOrWeather(name)) {
+          console.log(`      → Skipping invalid name: "${name}"`);
+          return;
+        }
+        
+        console.log(`      → Pokemon name: ${name}`);
+        
+        // Extract image URL
+        const imageUrl = img.getAttribute('src') || 
+                        `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_000_00.png`;
+        
+        // Find the card/container for this Pokemon
+        let card = img.closest('[class*="card"], [class*="raid"], [class*="boss"], [class*="pokemon"], article, div');
+        if (!card) {
+          card = img.parentElement;
+        }
+        
+        // Extract types from the card
         const types = [];
+        const typeElements = card.querySelectorAll('img[src*="type"], img[src*="TYPE"]');
         typeElements.forEach(typeImg => {
           const typeName = extractTypeName(typeImg);
-          if (typeName && TYPE_IMAGES[typeName]) {
+          if (typeName && TYPE_IMAGES[typeName] && !isTypeOrWeather(typeName)) {
             types.push({
               name: typeName,
               image: TYPE_IMAGES[typeName]
@@ -346,20 +651,14 @@ function parseLeekDuckHTML(html) {
           }
         });
         
-        // Extract CP range
-        const cpText = card.textContent.match(/CP\s*:?\s*(\d+\s*-\s*\d+)/i) || 
-                      card.textContent.match(/(\d+)\s*-\s*(\d+)\s*CP/i);
-        const cpRange = cpText ? parseCPRange(cpText[0]) : { min: 0, max: 0 };
-        
-        // Calculate boosted CP (typically 25% higher)
-        const boostedCP = {
-          min: Math.floor(cpRange.min * 1.25),
-          max: Math.floor(cpRange.max * 1.25)
-        };
+        // Extract CP ranges from card text
+        const cardText = card.textContent || '';
+        const cpRanges = parseCPRanges(cardText);
+        console.log(`      → CP: ${cpRanges.normal.min}-${cpRanges.normal.max} (${cpRanges.boosted.min}-${cpRanges.boosted.max} boosted)`);
         
         // Extract weather boosts
-        const weatherElements = card.querySelectorAll('img[src*="weather"], img[alt*="weather"]');
         const boostedWeather = [];
+        const weatherElements = card.querySelectorAll('img[src*="weather"], img[src*="Weather"]');
         weatherElements.forEach(weatherImg => {
           const weatherName = extractWeatherName(weatherImg);
           if (weatherName && WEATHER_IMAGES[weatherName]) {
@@ -370,8 +669,15 @@ function parseLeekDuckHTML(html) {
           }
         });
         
-        // Check for shiny (look for shiny indicators)
-        const canBeShiny = card.textContent.includes('Shiny') || 
+        if (types.length > 0) {
+          console.log(`      → Types: ${types.map(t => t.name).join(', ')}`);
+        }
+        if (boostedWeather.length > 0) {
+          console.log(`      → Weather: ${boostedWeather.map(w => w.name).join(', ')}`);
+        }
+        
+        // Check for shiny
+        const canBeShiny = cardText.includes('Shiny') || 
                           card.querySelector('[class*="shiny"]') !== null ||
                           card.querySelector('img[src*="shiny"]') !== null;
         
@@ -382,53 +688,80 @@ function parseLeekDuckHTML(html) {
           canBeShiny: canBeShiny,
           types: types.length > 0 ? types : [{ name: 'Normal', image: TYPE_IMAGES.Normal }],
           combatPower: {
-            normal: cpRange,
-            boosted: boostedCP
+            normal: cpRanges.normal,
+            boosted: cpRanges.boosted
           },
           boostedWeather: boostedWeather,
-          image: imageUrl || `https://raw.githubusercontent.com/PokeMiners/pogo_assets/master/Images/Pokemon/pokemon_icon_000_00.png`
+          image: imageUrl
         };
         
-        raids.push(raid);
+        // Only add if CP is valid (not 0-0)
+        if (cpRanges.normal.min > 0 && cpRanges.normal.max > 0) {
+          raids.push(raid);
+          console.log(`      → ✅ Added ${name} to ${tier}`);
+        } else {
+          console.log(`      → ❌ Skipping ${name} - invalid CP range`);
+        }
       } catch (error) {
-        console.warn('Error parsing raid card:', error);
+        console.warn('Error parsing Pokemon card:', error);
       }
     });
   });
   
   // If no raids found with headers, try alternative parsing
   if (raids.length === 0) {
-    // Look for any Pokemon cards with images
-    const allCards = doc.querySelectorAll('[class*="card"], [class*="raid"], article, [class*="pokemon-card"]');
-    allCards.forEach(card => {
-      const img = card.querySelector('img');
-      const text = card.textContent;
-      
-      if (img && text) {
-        // Try to infer tier from context or default to Tier 1
+    console.log('No raids found with headers, trying alternative parsing...');
+    // Look for any Pokemon images directly
+    const allPokemonImages = doc.querySelectorAll('img[src*="pokemon_icons"]');
+    allPokemonImages.forEach(img => {
+      try {
+        // Extract name from nearby text
+        let name = null;
+        let node = img.nextSibling;
+        while (node && !name) {
+          if (node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent.trim();
+            if (text && !isTypeOrWeather(text)) {
+              name = text;
+              break;
+            }
+          }
+          node = node.nextSibling;
+        }
+        
+        if (!name || isTypeOrWeather(name)) return;
+        
+        // Try to infer tier from context
+        const parent = img.closest('article, [class*="card"], [class*="raid"]') || img.parentElement;
+        const text = parent ? parent.textContent : '';
         const tier = text.includes('5') ? 'Tier 5' :
                     text.includes('3') ? 'Tier 3' :
                     text.includes('Mega') ? 'Mega' : 'Tier 1';
         
-        const name = text.split('\n')[0].trim() || 'Unknown';
-        if (name.length < 2) return;
+        const cpRanges = parseCPRanges(text);
         
-        raids.push({
-          name: name,
-          tier: tier,
-          canBeShiny: text.includes('Shiny'),
-          types: [{ name: 'Normal', image: TYPE_IMAGES.Normal }],
-          combatPower: {
-            normal: { min: 0, max: 0 },
-            boosted: { min: 0, max: 0 }
-          },
-          boostedWeather: [],
-          image: img.getAttribute('src') || ''
-        });
+        // Only add if CP is valid
+        if (cpRanges.normal.min > 0 && cpRanges.normal.max > 0) {
+          raids.push({
+            name: name,
+            tier: tier,
+            canBeShiny: text.includes('Shiny'),
+            types: [{ name: 'Normal', image: TYPE_IMAGES.Normal }],
+            combatPower: {
+              normal: cpRanges.normal,
+              boosted: cpRanges.boosted
+            },
+            boostedWeather: [],
+            image: img.getAttribute('src') || ''
+          });
+        }
+      } catch (error) {
+        console.warn('Error in alternative parsing:', error);
       }
     });
   }
   
+  console.log(`=== Finished parsing. Found ${raids.length} valid raids ===`);
   return raids;
 }
 
@@ -540,7 +873,15 @@ export async function fetchRaids() {
  * IMPORTANT: ScrapedDuck uses exact strings "Tier 1", "Tier 3", "Tier 5", "Mega"
  */
 export function groupRaidsByTier(raids) {
-  const grouped = { 1: [], 3: [], 5: [], mega: [] };
+  const grouped = { 
+    1: [], 
+    3: [], 
+    5: [], 
+    mega: [],
+    shadow1: [],
+    shadow3: [],
+    shadow5: []
+  };
   
   raids.forEach(raid => {
     const tier = raid.tier;
@@ -553,6 +894,12 @@ export function groupRaidsByTier(raids) {
       grouped[5].push(raid);
     } else if (tier === "Mega") {
       grouped.mega.push(raid);
+    } else if (tier === "Shadow 1") {
+      grouped.shadow1.push(raid);
+    } else if (tier === "Shadow 3") {
+      grouped.shadow3.push(raid);
+    } else if (tier === "Shadow 5") {
+      grouped.shadow5.push(raid);
     }
   });
   
