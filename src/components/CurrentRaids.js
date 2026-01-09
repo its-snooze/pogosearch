@@ -5,7 +5,8 @@ import {
   groupRaidsByTier,
   getCachedRaids,
   setCachedRaids,
-  getCountersString
+  getCountersString,
+  getRaidsDataSource
 } from '../utils/scrapedDuckAPI';
 
 const tierConfig = {
@@ -19,6 +20,7 @@ const CurrentRaids = () => {
   const [raids, setRaids] = useState({ 1: [], 3: [], 5: [], mega: [] });
   const [loading, setLoading] = useState(true);
   const [copiedBoss, setCopiedBoss] = useState(null);
+  const [dataSource, setDataSource] = useState(null);
 
   const loadRaids = async (forceRefresh = false) => {
     if (forceRefresh) {
@@ -33,6 +35,7 @@ const CurrentRaids = () => {
         if (cached) {
           const grouped = groupRaidsByTier(cached);
           setRaids(grouped);
+          setDataSource(getRaidsDataSource());
           setLoading(false);
         }
       }
@@ -41,6 +44,7 @@ const CurrentRaids = () => {
       const freshRaids = await fetchRaids();
       const grouped = groupRaidsByTier(freshRaids);
       setRaids(grouped);
+      setDataSource(getRaidsDataSource());
       setLoading(false);
     } catch (error) {
       console.error('Error loading raids:', error);
@@ -75,9 +79,24 @@ const CurrentRaids = () => {
         <p className="text-gray-400 mb-1">
           Click 'Copy Counters' to get the best counters for each boss
         </p>
-        <p className="text-sm text-gray-500 mb-4">
-          Data auto-updates from LeekDuck via ScrapedDuck
+        <p className="text-sm text-gray-500 mb-2">
+          Data source: {
+            dataSource === 'scrapedduck' ? 'ScrapedDuck API' :
+            dataSource === 'leekduck' ? 'LeekDuck (scraped)' :
+            dataSource === 'fallback' ? 'Hardcoded (may be outdated)' :
+            'Loading...'
+          }
         </p>
+        {dataSource === 'fallback' && (
+          <p className="text-sm text-yellow-400 mb-4">
+            ⚠️ Using fallback data - raid information may be outdated. Please refresh or check back later.
+          </p>
+        )}
+        {!dataSource && (
+          <p className="text-sm text-gray-500 mb-4">
+            Data auto-updates from LeekDuck via ScrapedDuck
+          </p>
+        )}
         <button
           onClick={() => loadRaids(true)}
           className="flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
