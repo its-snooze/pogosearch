@@ -9,6 +9,8 @@ import { getUIText } from './translations/uiTranslations';
 import CustomAgeInput from './components/CustomAgeInput';
 import CustomSpeciesCountInput from './components/CustomSpeciesCountInput';
 import { parseSearchString, validateSearchString, buildSearchString as buildSearchStringFromParser } from './utils/searchParser';
+import CurrentEvents from './components/CurrentEvents';
+import CurrentRaids from './components/CurrentRaids';
 
 // Category metadata with colors and icons - names will be translated in component
 const categoryMeta = {
@@ -325,6 +327,7 @@ const filterCategories = {
 };
 
 const PokemonGoSearchBuilder = () => {
+  const [activeView, setActiveView] = useState('builder'); // 'builder' or 'raids'
   const [searchString, setSearchString] = useState('');
   const [filterOperators, setFilterOperators] = useState({});
   // Structure: { 'filterId': 'AND' | 'OR' | 'NOT' | null }
@@ -2264,7 +2267,36 @@ const PokemonGoSearchBuilder = () => {
         </div>
       </div>
 
-      {/* Sticky Search String Display Bar */}
+      {/* Navigation Tabs */}
+      <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
+        <div className="flex gap-2 mb-4">
+          <button
+            onClick={() => setActiveView('builder')}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              activeView === 'builder' 
+                ? 'bg-blue-500 text-white dark:bg-blue-600' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            Search Builder
+          </button>
+          <button
+            onClick={() => setActiveView('raids')}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              activeView === 'raids' 
+                ? 'bg-blue-500 text-white dark:bg-blue-600' 
+                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+            }`}
+          >
+            Current Raids
+          </button>
+        </div>
+      </div>
+
+      {/* Conditional Content Rendering */}
+      {activeView === 'builder' ? (
+        <>
+          {/* Sticky Search String Display Bar */}
       <div className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-blue-100 shadow-sm dark:bg-slate-900/90 dark:border-slate-800 dark:shadow-slate-900/40">
         <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
           <div className="bg-gradient-to-br from-white to-blue-50/50 rounded-xl shadow-lg p-4 sm:p-5 border-2 border-blue-200/50 dark:from-slate-900 dark:to-slate-900/70 dark:border-slate-700 dark:shadow-slate-900/40">
@@ -3548,7 +3580,11 @@ const PokemonGoSearchBuilder = () => {
         <div className="mt-8 mb-6 text-center text-gray-500 text-xs sm:text-sm dark:text-slate-500">
           <p>Built for Pokémon GO trainers 🎮</p>
         </div>
-      </div>
+        </div>
+        </>
+      ) : (
+        <CurrentRaids />
+      )}
 
       {/* Save Search Modal */}
       {showSaveModal && (
