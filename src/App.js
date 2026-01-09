@@ -9,7 +9,6 @@ import { getUIText } from './translations/uiTranslations';
 import CustomAgeInput from './components/CustomAgeInput';
 import CustomSpeciesCountInput from './components/CustomSpeciesCountInput';
 import { parseSearchString, validateSearchString, buildSearchString as buildSearchStringFromParser } from './utils/searchParser';
-import CurrentEvents from './components/CurrentEvents';
 import CurrentRaids from './components/CurrentRaids';
 
 // Category metadata with colors and icons - names will be translated in component
@@ -2269,23 +2268,23 @@ const PokemonGoSearchBuilder = () => {
 
       {/* Navigation Tabs */}
       <div className="w-full max-w-full md:max-w-7xl md:mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4">
-        <div className="flex gap-2 mb-4">
+        <div className="flex gap-2 mb-6">
           <button
             onClick={() => setActiveView('builder')}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeView === 'builder' 
-                ? 'bg-blue-500 text-white dark:bg-blue-600' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              activeView === 'builder'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
             Search Builder
           </button>
           <button
             onClick={() => setActiveView('raids')}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeView === 'raids' 
-                ? 'bg-blue-500 text-white dark:bg-blue-600' 
-                : 'bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600'
+            className={`px-6 py-3 rounded-lg font-medium transition-colors ${
+              activeView === 'raids'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
             }`}
           >
             Current Raids

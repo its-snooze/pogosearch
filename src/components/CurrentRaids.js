@@ -20,13 +20,9 @@ const CurrentRaids = () => {
   const [loading, setLoading] = useState(true);
   const [copiedBoss, setCopiedBoss] = useState(null);
 
-  /**
-   * Loads raid data from cache or API
-   */
   const loadRaids = async (forceRefresh = false) => {
     if (forceRefresh) {
       setLoading(true);
-      // Clear cache to force fresh fetch
       localStorage.removeItem('pogosearch_raids_cache');
     }
 
@@ -41,7 +37,7 @@ const CurrentRaids = () => {
         }
       }
 
-      // Always fetch fresh data in background (or immediately if no cache)
+      // Fetch fresh data
       const freshRaids = await fetchRaids();
       const grouped = groupRaidsByTier(freshRaids);
       setRaids(grouped);
@@ -56,9 +52,6 @@ const CurrentRaids = () => {
     loadRaids();
   }, []);
 
-  /**
-   * Handles copying counters to clipboard
-   */
   const handleCopyCounters = async (bossName) => {
     const countersString = getCountersString(bossName);
     
@@ -76,7 +69,7 @@ const CurrentRaids = () => {
 
   return (
     <div className="p-6">
-      {/* Header with title and refresh button */}
+      {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-white mb-2">Current Raid Bosses</h1>
         <p className="text-gray-400 mb-1">
@@ -126,7 +119,7 @@ const CurrentRaids = () => {
                       key={`${raid.name}-${index}`}
                       className="bg-gray-800 rounded-xl border-2 border-gray-700 p-4 hover:border-blue-500 hover:shadow-lg transition-all"
                     >
-                      {/* Boss Image Container */}
+                      {/* Boss Image */}
                       <div className="relative mb-3">
                         <img 
                           src={raid.image} 
@@ -160,7 +153,7 @@ const CurrentRaids = () => {
                         </div>
                       )}
 
-                      {/* CP Info */}
+                      {/* CP Range */}
                       {raid.combatPower && raid.combatPower.normal && (
                         <div className="text-center mb-2">
                           <div className="text-gray-300 font-medium">
